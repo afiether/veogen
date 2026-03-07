@@ -1,0 +1,109 @@
+<style>
+  textarea {
+    width: 100%;
+    height: 200px;
+  }
+  iframe {
+    /*width: 1080px;
+    height: 1080px;*/
+    /*width: 100%;
+    height: 100%;*/
+  }
+</style>
+
+<div>
+  <label for="endpoint">Endpoint URL:</label>
+  <input type="text" id="endpoint" name="endpoint" placeholder="Enter endpoint URL">
+  <br>
+  <label for="jsonInput">JSON Input:</label>
+  <textarea id="jsonInput" name="jsonInput" placeholder="Enter JSON data"></textarea>
+  <br>
+  <button onclick="postData()" id="submit">Submit</button>
+  <h4>Warning: Use only Chrome browser for the real results</h4>
+  <br>
+  <iframe id="responseFrame" frameborder="0"
+    sandbox="allow-scripts allow-same-origin allow-media-playback"></iframe>
+  </iframe>
+
+  <script>
+    async function postData() {
+      const endpoint = document.getElementById('endpoint').value;
+      const jsonInput = document.getElementById('jsonInput').value;
+
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: jsonInput
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch');
+        }
+
+        const htmlResponse = await response.text();
+
+        // Determine width and height
+        const pattern = /width=(\d+), height=(\d+)/;
+
+        // Use match() to extract the width and height values
+        const match = htmlResponse.match(pattern);
+        const iframe = document.getElementById('responseFrame')
+
+        if (match) {
+          // Extracted width and height values will be in match[1] and match[2] respectively
+          const width = match[1];
+          const height = match[2];
+          iframe.style.width = `${width}px`;
+          iframe.style.height = `${height}px`;
+        } else {
+          console.log('Width and height values not found.');
+        }
+
+        iframe.srcdoc = htmlResponse;
+        //const blob = new Blob([htmlResponse], { type: "text/html" });
+        //iframe.src = URL.createObjectURL(blob);
+
+      } catch (error) {
+        console.error('Error:', error);
+      }
+    }
+    const iframe = document.getElementById('responseFrame');
+    const submit = document.getElementById('submit');
+    iframe.addEventListener('load', () => {
+      const iframeDocument = iframe.contentDocument || iframe.contentWindow.document;
+      const images = iframeDocument.querySelectorAll('img');
+  
+      let loadedCount = 0;
+      
+      function imgLoaded() {
+        loadedCount++;
+        if (loadedCount === images.length) {
+          console.log('IFrame content has been loaded');
+    
+          //iframe.setAttribute('data-loaded', 'TRUE');
+          submit.setAttribute('data-loaded', 'TRUE');
+        }
+      }
+
+      images.forEach(img => {
+        if (img.complete) {
+          console.log(`Complete img: ${img.src}`)
+          imgLoaded();
+        } else {
+          img.addEventListener('load', () => {
+            console.log(`Loaded img: ${img.src}`)
+            imgLoaded();
+          });
+        }        
+      });
+
+      if (images.length <= 0) {
+        // No images to load
+        submit.setAttribute('data-loaded', 'TRUE');
+      }
+    });
+  </script>
+</div>

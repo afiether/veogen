@@ -1,0 +1,116 @@
+<style>
+
+</style>
+
+{{#if backgroundImage}}
+  <img src="{{backgroundImage}}" class="backgroundImage" />
+{{/if}}
+
+{{#if backgroundVideo}}
+  <video autoplay muted loop class="backgroundVideo">
+    <source src="{{backgroundVideo}}" type="video/mp4">
+    Your browser does not support the video tag.
+  </video>
+{{/if}}
+
+<h1 style="position: absolute; top: 0px; font-size: 90px; color: #061541; text-transform:uppercase; z-index: 10; text-align: center; width: 100%;">{{{ title }}}</h1>
+<h2 style="position: absolute; top: 140px;  font-size: 45px; color: #e79a56;  text-transform:uppercase; z-index: 10; text-align: center; width: 100%;">{{{ subtitle }}}</h1>
+
+<div class="content-text">
+  <p>{{{ text }}}</p>
+
+  <ul>
+    {{#each ulist}}
+    <li>{{{ this }}}</li>
+    {{/each}}
+  </ul>
+
+  <ol>
+    {{#each olist}}
+    <li>{{{ this }}}</li>
+    {{/each}}
+  </ol>
+</div>
+
+{{#if showcaseImage }}
+<div  style="text-align: center;  white-space: nowrap; margin: 1.5em 0; height: 100%;">
+{{!-- <center> --}}
+<span class="helper"></span>
+  <img src="{{ showcaseImage }}" style=" border-radius: 25px; vertical-align: middle;" align="middle"/>
+{{!-- </center> --}}
+</div>
+{{/if}}
+
+{{!-- Here custom elements --}}
+
+<div id="animations-finished"></div>
+<div id="page-loaded"></div>
+
+<script>
+  $(function(){
+    const animationsFinishedFlag = $('#animations-finished');
+    const pageLoadedFlag = $('#page-loaded');
+    const pending = new Set();       // “stack” of active animations
+
+    function markStart(id) { pending.add(id); }
+    function markEnd(id) {
+        pending.delete(id);
+        if (pending.size === 0) {
+            animationsFinishedFlag.attr('data-animations-finished','TRUE');
+            console.log('All animations finished');
+        }
+    }
+
+    // wrapper that returns the jQuery node to animate
+    function getElement(def) {
+        if (def.selector) {
+            return $(def.selector);             // existing element
+        }
+        // otherwise create a new one
+        const el = $(`<${def.type}/>`);
+        if (def.id) el.attr('id', def.id);
+        if (def.attr) el.attr(def.attr);
+        if (def.innerHtml) el.html(def.innerHtml);
+        $('body').append(el);                  // or insert wherever you need
+        return el;
+    }
+
+    function applyDefinitions(el, def, uid) {
+        if (def.css) el.css(def.css);
+
+        // css‑animation: if you just set CSS that triggers a @keyframes animation
+        // you can listen for animationend on the element itself:
+        if (def.css && def.css.animationName) {
+            el.on('animationend webkitAnimationEnd', () => markEnd(uid));
+            markStart(uid);
+        }
+
+        // jQuery animate
+        if (def.animate) {
+            markStart(uid);
+            el.animate(def.animate.properties || {}, def.animate.duration || 400,
+                       () => markEnd(uid));
+        }
+
+        // jQuery UI effect
+        if (def.effect) {
+            markStart(uid);
+            el.effect(def.effect.name, def.effect.options || {},
+                      def.effect.duration || 400, () => markEnd(uid));
+        }
+    }
+
+    const visualElements = {{{ toJSON visualElements }}};
+
+    // driver: iterate the array your server injected
+    if (Array.isArray(visualElements)) {
+        visualElements.forEach((def,i) => {
+            const uid = def.id || `ve_${i}`;   // unique key for the stack
+            const el = getElement(def);
+            applyDefinitions(el, def, uid);
+        });
+    }
+
+    pageLoadedFlag.attr('data-loaded', 'TRUE');
+  });
+</script>

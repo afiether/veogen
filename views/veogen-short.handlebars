@@ -1,0 +1,72 @@
+<style>
+
+</style>
+
+<h1 style="position: absolute; top: 0px; font-size: 90px; color: #061541; text-transform:uppercase; z-index: 10; text-align: center; width: 100%;">{{{ title }}}</h1>
+<h2 style="position: absolute; top: 140px;  font-size: 45px; color: #e79a56;  text-transform:uppercase; z-index: 10; text-align: center; width: 100%;">{{{ subtitle }}}</h1>
+
+<div class="content-text">
+  <p>{{{ text }}}</p>
+
+  <ul>
+    {{#each ulist}}
+    <li>{{{ this }}}</li>
+    {{/each}}
+  </ul>
+
+  <ol>
+    {{#each olist}}
+    <li>{{{ this }}}</li>
+    {{/each}}
+  </ol>
+</div>
+
+{{#if showcaseImage }}
+<div  style="text-align: center;  white-space: nowrap; margin: 1.5em 0; height: 100%;">
+{{!-- <center> --}}
+<span class="helper"></span>
+  <img src="{{ showcaseImage }}" style=" border-radius: 25px; vertical-align: middle;" align="middle"/>
+{{!-- </center> --}}
+</div>
+{{/if}}
+
+
+
+<!-- optional bounce sound, path can be provided as {{bounceSound}} -->
+<audio id="bounce-sound" style="display:none" src="{{bounceSound}}">
+  {{!-- <source src="{{bounceSound}}" > --}}
+</audio>
+
+<script>
+  $(function(){
+    // fade in the main content text
+    $('.content-text').css({opacity:0}).animate({opacity:1},2000);
+
+    // bounce the title a few times for effect
+    const title = $('h1');
+    title.css({position:'relative'}).effect('bounce',{times:3},5000);
+
+    // play sound when bounce starts
+    let playTimes = 0;
+    const maxPlays = 3; // limit to 3 plays to avoid spamming
+    const sound = $('#bounce-sound');
+    if(sound?.length > 0 && sound.attr('src')) {
+      //title.on('mousedown click', () => {}); // ensure jQuery registers interaction? not needed
+      console.log('Playing bounce sound');
+
+      sound.on('ended', function() {
+        playTimes++;
+        if(playTimes < maxPlays) {
+          console.log('Replaying bounce sound, play count:', playTimes);
+          sound.trigger('play');
+        } else {
+          console.log('Max bounce sound plays reached');
+        }
+      });
+
+      sound.trigger('play');
+    } else {
+      console.log('No bounce sound provided');
+    }
+  });
+</script>

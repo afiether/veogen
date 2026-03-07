@@ -1,0 +1,23 @@
+<style>
+.gradient-text {
+  font-size: 38px;
+  font-weight: bold;
+  background: linear-gradient(90deg, #9d4992, #ec724a);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.content-text{ 
+  position: absolute; top: 170px;  font-size: 65px; color: #0e0d0d;  z-index: 10; width: 96%; padding: 70px;
+}
+</style>
+
+<div style="position: absolute; top: 650px; width: 100%;">
+<h1 style="font-size: 90px; color: #061541; text-transform:uppercase; z-index: 10; text-align: center; width: 100%;">{{{ title }}}</h1>
+<h2 style=" font-size: 45px; color: #ac692e;  text-transform:uppercase; z-index: 10; text-align: center; width: 100%;">{{{ subtitle }}}</h1>
+
+</div>
+
+
+{{#if showcaseImage }}
+  <img src="{{ showcaseImage }}" style="position: absolute; top: 22px; left: 620px; width: 690px; height: 690px; border-radius: 25px;"/>
+{{/if}}

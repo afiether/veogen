@@ -1,0 +1,45 @@
+<style>
+.gradient-text {
+  font-size: 38px;
+  font-weight: bold;
+  background: linear-gradient(90deg, #9d4992, #ec724a);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.content-text{ 
+  position: absolute; top: 140px;  font-size: 65px; color: #0e0d0d;  z-index: 10; width: 96%; padding: 70px;
+}
+.helper {
+    display: inline-block;
+    height: 100%;
+    vertical-align: middle;
+}
+</style>
+
+<h1 style="position: absolute; top: 0px; font-size: 90px; color: #061541; text-transform:uppercase; z-index: 10; text-align: center; width: 100%;">{{{ title }}}</h1>
+<h2 style="position: absolute; top: 140px;  font-size: 45px; color: #e79a56;  text-transform:uppercase; z-index: 10; text-align: center; width: 100%;">{{{ subtitle }}}</h1>
+
+<div class="content-text">
+  <p>{{{ text }}}</p>
+
+  <ul>
+    {{#each ulist}}
+    <li>{{{ this }}}</li>
+    {{/each}}
+  </ul>
+
+  <ol>
+    {{#each olist}}
+    <li>{{{ this }}}</li>
+    {{/each}}
+  </ol>
+</div>
+
+{{#if showcaseImage }}
+<div  style="text-align: center;  white-space: nowrap; margin: 1.5em 0; height: 100%;">
+{{!-- <center> --}}
+<span class="helper"></span>
+  <img src="{{ showcaseImage }}" style=" border-radius: 25px; vertical-align: middle;" align="middle"/>
+{{!-- </center> --}}
+</div>
+{{/if}}
