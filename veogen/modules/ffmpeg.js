@@ -79,6 +79,33 @@ async function generateMp4FromPngAndMp3(pngPath, audioPath, outputPath) {
   });
 }
 
+async function generateMp4FromMp4AndWav(mp4Path, wavPath, outputPath) {
+  return new Promise((resolve, reject) => {
+    const args = [
+      '-y',
+      '-i', mp4Path,
+      '-i', wavPath,
+      '-c:v', 'copy',
+      '-c:a', 'aac',
+      '-b:a', '192k',
+      '-map', '0:v:0',
+      '-map', '1:a:0',
+      outputPath
+    ];
+
+    const ffmpeg = spawn('ffmpeg', args, { stdio: 'inherit' });
+
+    ffmpeg.on('error', reject);
+    ffmpeg.on('close', (code) => {
+      if (code === 0) {
+        resolve(outputPath);
+      } else {
+        reject(new Error(`FFmpeg exited with code ${code}`));
+      }
+    });
+  });
+}
+
 /**
  * Concatenate MP4s using concat demuxer (no re-encoding)
  * @param {string} projectPath Our project path
@@ -157,4 +184,5 @@ module.exports = {
   concatMp4s,
   getAudioDuration,
   convertWebMToMP4,
+  generateMp4FromMp4AndWav,
 };

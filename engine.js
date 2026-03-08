@@ -538,6 +538,8 @@ async function renderVideoPageX11(url, data, filePath) {
     "-video_size", `${width}x${height}`,
     "-framerate", "30",
     "-f", "x11grab",
+    // disable drawing the mouse cursor (hides it in the capture)
+    "-draw_mouse", "0",
     "-i", `${display}.0`,
     // "-vf", `crop=${Math.round(box.width)}:${Math.round(box.height)}:${Math.round(box.x)}:${Math.round(box.y)}`,
     "-c:v", "libx264",

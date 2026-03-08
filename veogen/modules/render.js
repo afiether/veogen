@@ -19,6 +19,23 @@ async function renderMedia(engineUrl, type, data) {
   return Buffer.from(imageResp.data);
 }
 
+async function renderMediaVideo(engineUrl, type, data) {
+  const resp = await axios.post(`${engineUrl}/renderVideoPage`, {
+    url: `/${type}`,
+    data,
+  });
+
+  const fileName = resp.data.fileName;
+
+  const imageResp = await axios.request({
+    method: 'get',
+    url: `${engineUrl}/export/${fileName}`,
+    responseType: 'arraybuffer',
+  });
+
+  return Buffer.from(imageResp.data);
+}
+
 async function renderSlide(engineUrl, data) {
   return await renderMedia(engineUrl, 'veogen', data);
 }
@@ -29,6 +46,10 @@ async function renderIntro(engineUrl, data) {
 
 async function renderOutro(engineUrl, data) {
   return await renderMedia(engineUrl, 'veogen-outro', data);
+}
+
+async function renderVeogenVideo(engineUrl, veogenType, data) {
+  return await renderMediaVideo(engineUrl, `veogen/${veogenType}`, data);
 }
 
 /**
@@ -62,5 +83,6 @@ module.exports = {
   renderSlide,
   renderIntro,
   renderOutro,
+  renderVeogenVideo,
   imageToHtmlBase64,
 };

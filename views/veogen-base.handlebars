@@ -13,33 +13,70 @@
   </video>
 {{/if}}
 
-<h1 style="position: absolute; top: 0px; font-size: 90px; color: #061541; text-transform:uppercase; z-index: 10; text-align: center; width: 100%;">{{{ title }}}</h1>
-<h2 style="position: absolute; top: 140px;  font-size: 45px; color: #e79a56;  text-transform:uppercase; z-index: 10; text-align: center; width: 100%;">{{{ subtitle }}}</h1>
-
-<div class="content-text">
-  <p>{{{ text }}}</p>
-
-  <ul>
-    {{#each ulist}}
-    <li>{{{ this }}}</li>
-    {{/each}}
-  </ul>
-
-  <ol>
-    {{#each olist}}
-    <li>{{{ this }}}</li>
-    {{/each}}
-  </ol>
-</div>
-
-{{#if showcaseImage }}
-<div  style="text-align: center;  white-space: nowrap; margin: 1.5em 0; height: 100%;">
-{{!-- <center> --}}
-<span class="helper"></span>
-  <img src="{{ showcaseImage }}" style=" border-radius: 25px; vertical-align: middle;" align="middle"/>
-{{!-- </center> --}}
+{{#if glitchTitle}}
+<div class="glitch-wrapper">
+  <h1 class="glitch" data-text="{{{ glitchTitle }}}">
+    {{{ glitchTitle }}}
+  </h1>
 </div>
 {{/if}}
+
+<div class="tech-scene">
+  <h1>{{{ title }}}</h1>
+  <h2>{{{ subtitle }}}</h2>
+
+  <div class="tech-bar"></div>
+
+  <div class="content-text">
+    <p>{{{ text }}}</p>
+
+    <ul>
+      {{#each ulist}}
+      <li>{{{ this }}}</li>
+      {{/each}}
+    </ul>
+
+    <ol>
+      {{#each olist}}
+      <li>{{{ this }}}</li>
+      {{/each}}
+    </ol>
+  </div>
+
+  {{#if showcaseImage }}
+  <div  style="text-align: center;  white-space: nowrap; margin: 1.5em 0; height: 100%;">
+    {{!-- <center> --}}
+    <span class="helper"></span>
+      <img id="showcaseImage" src="{{ showcaseImage }}" style=" border-radius: 25px; vertical-align: middle;" align="middle"/>
+    {{!-- </center> --}}
+  </div>
+  {{/if}}
+
+  {{#if terminalHeader}}
+  <div class="terminal">
+    <div class="terminal-header">{{{ terminalHeader }}}</div>
+    <div class="terminal-line">
+      <span class="prompt">$</span>
+      <span class="typing"></span>
+    </div>
+  </div>
+  {{/if}}
+
+  {{#if matrixTitle}}
+  <div class="matrix-container">
+
+    <div class="matrix-lines"></div>
+
+    <h1 class="matrix-title">
+      {{ matrixTitle }}
+    </h1>
+
+  </div>
+  {{/if}}
+</div>
+
+
+
 
 {{!-- Here custom elements --}}
 
@@ -47,7 +84,23 @@
 <div id="page-loaded"></div>
 
 <script>
-  $(function(){
+  // Terminal typing effect and animation driver
+  const text = {{{ toJSON terminalPrompt }}} || '';
+  const terminalSleep = {{{ toJSON terminalSleep }}} || 130;
+  let i = 0;
+
+  function type(){
+    if(i < text.length){
+      $('.typing').append(text.charAt(i));
+      i++;
+      setTimeout(type,130);
+    }
+  }
+  setTimeout(type, terminalSleep);
+  //$(document).ready(type)
+
+  $(document).ready(function() {
+    // Custom visual elements
     const animationsFinishedFlag = $('#animations-finished');
     const pageLoadedFlag = $('#page-loaded');
     const pending = new Set();       // “stack” of active animations
@@ -88,7 +141,7 @@
         // jQuery animate
         if (def.animate) {
             markStart(uid);
-            el.animate(def.animate.properties || {}, def.animate.duration || 400,
+            el.animate(def.animate.properties || {}, def.animate.options || 400,
                        () => markEnd(uid));
         }
 
@@ -96,7 +149,7 @@
         if (def.effect) {
             markStart(uid);
             el.effect(def.effect.name, def.effect.options || {},
-                      def.effect.duration || 400, () => markEnd(uid));
+                      def.effect.options || 400, () => markEnd(uid));
         }
     }
 
@@ -111,6 +164,62 @@
         });
     }
 
+    // Static animations
+    // text climbs up
+    $('.content-text').animate({
+      opacity: 1
+    }, {
+      duration: 900,
+      step: function(now) {
+        const y = 80 - now * 80;
+        $(this).css("transform", `translateY(${y}px)`);
+      }
+    });
+
+    const expectedDuration = {{ toJSON expectedDuration }} || 2200;
+    const techBarDelay = 300;
+
+    // tech bar expands
+    $('.tech-bar').delay(techBarDelay).animate({
+      width: "95%"
+    }, expectedDuration);
+
+    if (!Array.isArray(visualElements) || visualElements.length <= 0) {
+      // If no visual elements, we can mark animations as finished immediately
+      setTimeout(() => markEnd(), expectedDuration + techBarDelay);
+    }
+
+    // Cyberpunk glithch effect
+    setInterval(function(){
+
+      $('.glitch').css('transform',
+        `translate(${Math.random()*16-3}px,${Math.random()*26-3}px)`
+      );
+
+      setTimeout(()=>{
+        $('.glitch').css('transform','translate(0,0)');
+      },80);
+
+    },1200);
+
+    // Matrix lines animation
+    $('.matrix-lines').animate({
+      left:"-50%"
+    },3000);
+
+    $('.matrix-title').delay(400).animate({
+      opacity:1
+    },{
+      duration:900,
+      step:function(now){
+        const y = 40 - now*40;
+        $(this).css("transform",`translateY(${y}px)`);
+      }
+    });
+
+    // FINISH
     pageLoadedFlag.attr('data-loaded', 'TRUE');
   });
+
+  
 </script>

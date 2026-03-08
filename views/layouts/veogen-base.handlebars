@@ -5,11 +5,15 @@
 <meta name="viewport" content="width={{renderWidth}}, height={{renderHeight}}, initial-scale=1.0">
 <title>AFIEther</title>
 <style>
+
+  *{
+    transform:translateZ(0);
+    backface-visibility:hidden;
+  }
   
   .container {
     width: {{renderWidth}}px;
     height: {{renderHeight}}px;
-    //background-image: url('img/cover-veogen.png');
     background-size: initial;
     background-repeat: no-repeat;
     background-color: {{backgroundColor}}; /* fallback color */
@@ -17,16 +21,18 @@
     padding: 0;
     height: 100vh;
     overflow: hidden;
+    font-family: "Montserrat", sans-serif;
+    background: #d2eaf5;
   }
 
   .gradient-text {
-    font-size: 38px;
+    font-size: 90px;
     font-weight: bold;
     background: linear-gradient(90deg, #9d4992, #ec724a);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
   }
-  .content-text{ 
+  .content-text-orig { 
     position: absolute; top: 140px;  font-size: 65px; color: #0e0d0d;  z-index: 10; width: 96%; padding: 70px;
     font-family: Montserrat, sans-serif;
   }
@@ -62,6 +68,175 @@
     color: #333;
     z-index: 10;
     width: 80%;
+  }
+
+  /* Techy */
+
+  h1 {
+    font-size: 90px;
+    font-weight: bold;
+    background: linear-gradient(90deg, #9d4992, #ec724a);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    z-index: 10;
+  }
+
+  h2 {
+    font-size: 45px;
+    color: #e79a56;
+    text-transform: uppercase;
+    z-index: 10;
+    text-align: center;
+    width: 100%;
+  }
+ 
+  .tech-scene {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+  }
+
+  .content-text {
+    font-size: 56px;
+    font-weight: 700;
+    color: #00277d;
+    letter-spacing: 2px;
+
+    transform: translateY(80px);
+    opacity: 0;
+
+    text-shadow:
+      0 0 6px rgba(0, 39, 125, 0.6),
+      0 0 18px rgba(255, 80, 160, 0.4),
+      0 0 30px rgba(255, 120, 0, 0.3);
+
+    z-index: 10; 
+    padding-left: 20px;;
+  }
+
+  .tech-bar {
+    width: 0%;
+    height: 4px;
+    margin-top: 14px;
+
+    background: linear-gradient(
+      90deg,
+      #ff4fa3,
+      #ff8c3a,
+      #2d6cff
+    );
+
+    box-shadow: 0 0 8px #ff4fa3;
+
+    z-index: 10;
+  }
+
+  .scan-line {
+    position: absolute;
+    width: 100%;
+    height: 2px;
+
+    background: linear-gradient(
+      90deg,
+      transparent,
+      #ff4fa3,
+      transparent
+    );
+
+    opacity: 0.7;
+  }
+
+  /* Terminal */
+  .terminal{
+    width:100%;
+    padding:30px;
+    background:#0b1133;
+    border-radius:8px;
+    box-shadow:0 0 30px rgba(0,39,125,0.5);
+    color:#4fd3ff;
+  }
+
+  .terminal-header{
+    color:#ff8c3a;
+    margin-bottom:20px;
+  }
+
+  .prompt{
+    color:#ff4fa3;
+  }
+
+  .typing{
+    border-right:3px solid #2d6cff;
+    padding-right:6px;
+  }
+
+  /* Cyberpunk glitch effect */
+  .glitch-wrapper{
+    background:#050a1f;
+    height:200px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+
+  .glitch{
+    font-size:64px;
+    color:#00277d;
+    position:relative;
+    letter-spacing:4px;
+  }
+
+  .glitch:before,
+  .glitch:after{
+    content:attr(data-text);
+    position:absolute;
+    left:0;
+    top:0;
+  }
+
+  .glitch:before{
+    color:#ff4fa3;
+    clip-path:polygon(0 0,100% 0,100% 45%,0 45%);
+  }
+
+  .glitch:after{
+    color:#ff8c3a;
+    clip-path:polygon(0 55%,100% 55%,100% 100%,0 100%);
+  }
+
+  /* Matrix line effect */
+  .matrix-container{
+    background:#050a1f;
+    height:220px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    position:relative;
+    overflow:hidden;
+    z-index: 10;
+  }
+
+  .matrix-lines{
+    position:absolute;
+    width:200%;
+    height:100%;
+    background:repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 40px,
+      rgba(45,108,255,0.15) 41px
+    );
+  }
+
+  .matrix-title{
+    font-size:54px;
+    color:#00277d;
+    opacity:0;
+    transform:translateY(40px);
   }
   
 </style>
