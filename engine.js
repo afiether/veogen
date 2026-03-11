@@ -544,6 +544,7 @@ async function renderVideoPageX11(url, data, filePath) {
     // "-vf", `crop=${Math.round(box.width)}:${Math.round(box.height)}:${Math.round(box.x)}:${Math.round(box.y)}`,
     "-c:v", "libx264",
     "-preset", "veryfast",
+    "-b:v", "10M",
     "-pix_fmt", "yuv420p",
     "-movflags", "faststart",
     filePath
