@@ -1,5 +1,6 @@
 <style>
 
+
 </style>
 
 {{#if backgroundImage}}
@@ -23,13 +24,20 @@
 
 <div class="tech-scene">
   <h1>{{{ title }}}</h1>
+  {{#if subtitle}}
   <h2>{{{ subtitle }}}</h2>
+  {{/if}}
 
   <div class="tech-bar"></div>
 
   <div class="content-text">
+    {{#if enlargeSpace}}
+    {{!-- add some vertical space if needed --}}
+    <div style="height: {{ enlargeSpace }};"></div>
+    {{/if}}
     <p>{{{ text }}}</p>
 
+    
     <ul>
       {{#each ulist}}
       <li>{{{ this }}}</li>
@@ -44,7 +52,7 @@
   </div>
 
   {{#if showcaseImage }}
-  <div  style="text-align: center;  white-space: nowrap; margin: 1.5em 0; height: 100%;">
+  <div  style="text-align: center;  white-space: nowrap; margin: 1.5em 0; ">
     {{!-- <center> --}}
     <span class="helper"></span>
       <img id="showcaseImage" src="{{ showcaseImage }}" style=" border-radius: 25px; vertical-align: middle;" align="middle"/>
@@ -73,6 +81,14 @@
 
   </div>
   {{/if}}
+
+  {{!-- captions block: words rendered by helper --}}
+  {{#if captions}}
+  <div class="caption-text" id="caption-container">
+    {{{ renderCaptionWords captions }}}
+  </div>
+  {{/if}}
+
 </div>
 
 
@@ -216,6 +232,38 @@
         $(this).css("transform",`translateY(${y}px)`);
       }
     });
+
+    // caption utility functions --------------------------------------------------
+    function updateCaptions(timeMs) {
+      $('.caption-word').each(function() {
+        const start = parseInt($(this).attr('data-start'));
+        const end   = parseInt($(this).attr('data-end'));
+        if (!isNaN(start) && !isNaN(end) && timeMs >= start && timeMs <= end) {
+          $(this).addClass('highlight');
+        } else {
+          $(this).removeClass('highlight');
+        }
+      });
+    }
+
+    const audioVideoElements = $('audio, video');
+
+    if (audioVideoElements.length > 0) {
+      // if there's an audio/video element on the page we automatically hook it
+      $('audio, video').on('timeupdate', function() {
+        // convert seconds to milliseconds
+        const ms = this.currentTime * 1000;
+        updateCaptions(ms);
+      });
+    } else {
+      let startTime = 0;
+      // if no media element, we can use a simple timer to drive captions
+      setInterval(() => {
+        updateCaptions(startTime);
+        startTime += 100; // update every 100ms
+      }, 100);
+    }
+    
 
     // FINISH
     pageLoadedFlag.attr('data-loaded', 'TRUE');
