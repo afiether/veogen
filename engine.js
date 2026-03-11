@@ -554,7 +554,7 @@ async function renderVideoPageX11(url, data, filePath) {
 
   await page.waitForSelector(
     "#animations-finished[data-animations-finished]",
-    { timeout: 16000 }
+    { timeout: 60000 }
   ).catch(() => {
     console.error("Animations timeout — stopping recording.");
   });

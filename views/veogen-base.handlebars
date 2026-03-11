@@ -268,7 +268,7 @@
 
       if (audioVideoElements.length > 0) {
         // if there's an audio/video element on the page we automatically hook it
-        $('audio, video').on('timeupdate', function() {
+        audioVideoElements.on('timeupdate', function() {
           // convert seconds to milliseconds
           const ms = this.currentTime * 1000;
           updateCaptions(ms);
@@ -291,7 +291,8 @@
             setTimeout(()=>applyFragment(frag,i,frags.length), frag.startsAt);
         });
         const last = frags[frags.length-1];
-        const totalEnd = (last.startsAt||0) + expectedDuration + techBarDelay;
+        //const totalEnd = (last.startsAt||0) + expectedDuration + techBarDelay;
+        const totalEnd = expectedDuration + techBarDelay;
         setTimeout(()=>markEnd(), totalEnd);
     }
 

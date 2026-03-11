@@ -179,7 +179,7 @@ async function generateAssets(project, engineUrl) {
             text: fragment.textAppend ? (lastFragmentAppendData.text || '') + ' ' + fragment.textAppend : fragment.text,
             ulist: fragment.ulistAppend ? [...lastFragmentAppendData.ulist || [], ...fragment.ulistAppend] : fragment.ulist,
             olist: fragment.olistAppend ? [...lastFragmentAppendData.olist || [], ...fragment.olistAppend] : fragment.olist,
-            showcaseImage: fragment.showcaseImage ? render.imageToHtmlBase64(path.join(projectPath, fragment.showcaseImage)) : null,
+            showcaseImage: fragment?.showcaseImage?.startsWith('http') || fragment?.showcaseImage?.startsWith('/') ? fragment.showcaseImage : (fragment.showcaseImage ? `/projects/${project}/${fragment.showcaseImage}` : null),
             // expectedDuration: fragment.expectedDuration,
             startsAt,
             backgroundColor: fragment.backgroundColor,
