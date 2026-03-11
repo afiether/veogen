@@ -274,7 +274,7 @@
           updateCaptions(ms);
         });
       } else {
-        let startTime = 0;
+        let startTime = -{{{ toJSON captionsMarginError }}} || 0; // allow starting captions slightly before speech starts, to account for any sync issues and ensure captions are visible when speech starts
         // if no media element, we can use a simple timer to drive captions
         const captionInterval = setInterval(() => {
           if (!updateCaptions(startTime)) {

@@ -5,6 +5,7 @@ const yaml = require('js-yaml');
 const vertex = require('./modules/vertex');
 const ffmpeg = require('./modules/ffmpeg');
 const render = require('./modules/render');
+const audio = require('./modules/audio');
 let f5TTS = null;
 
 require('./modules/f5-tts').initF5TTS({
@@ -92,8 +93,6 @@ async function generateAssets(project, engineUrl) {
     const title = slide.title;
     const renderType = slide.renderType;
 
-    console.log(slide)
-
     let fragmentIndex = 0;
     let lastFragmentAppendData = {
       text: '',
@@ -120,26 +119,13 @@ async function generateAssets(project, engineUrl) {
       }
 
       if (!fs.existsSync(renderFile)) {
-        const fragment = slide.fragments[slide.fragments.length - 1];
-        const renderData = {
-          title: fragment.noTitle ? '' : title,
-          subtitle: fragment.subtitle,
-          text: fragment.textAppend ? (lastFragmentAppendData.text || '') + ' ' + fragment.textAppend : fragment.text,
-          ulist: fragment.ulistAppend ? [...lastFragmentAppendData.ulist || [], ...fragment.ulistAppend] : fragment.ulist,
-          olist: fragment.olistAppend ? [...lastFragmentAppendData.olist || [], ...fragment.olistAppend] : fragment.olist,
-          showcaseImage: fragment.showcaseImage ? render.imageToHtmlBase64(path.join(projectPath, fragment.showcaseImage)) : null,
-          expectedDuration: fragment.expectedDuration,
-        };
-
-        // console.log('Rendering video with data:', {
-        //   ...videoDefaults,
-        //   ...renderData
-        // });
-        let durationSeconds = 0;
+        let durationSpeech = 0;
+        const speechFilesDurations = [];
 
         for (const speechFile of speechFiles) {
-          const duration = await ffmpeg.getAudioDuration(speechFile);
-          durationSeconds += duration;
+          const duration = await ffmpeg.getAudioDuration(speechFile) * 1000;
+          durationSpeech += duration;
+          speechFilesDurations.push(duration);
         }
 
         const allSpeechFile = path.join(projectPath, `slide${padNr(slideIndex)}-speech.wav`);
@@ -147,12 +133,77 @@ async function generateAssets(project, engineUrl) {
         // Concatenate all speech files into one, to be used in the video render with the correct duration
         await ffmpeg.concatMp4s(projectPath, speechFiles, allSpeechFile);
 
-        console.log(`Total expected speech duration for slide ${slideIndex} is ${durationSeconds} seconds.`);
+        console.log(`Total expected speech duration for slide ${slideIndex} is ${durationSpeech / 1000} seconds.`);
 
-        const binaryRender = await render.renderVeogenVideo(engineUrl, 'base', {
+        const renderData = {
+          fragments: [],
+        };
+
+        let startsAt = 0;
+
+        for (const fragment of slide.fragments) {
+          const fragmentIndex = slide.fragments.indexOf(fragment);
+          let durationFragment = speechFilesDurations[fragmentIndex];
+          console.log(`Expected speech duration for slide ${slideIndex} fragment ${fragmentIndex} is ${durationFragment / 1000} seconds.`);
+          let captions = null;
+          // Captions with timings for the entire slide, to be used in the video render
+          if (fragment.enableCaptions) {
+            captions = audio.estimateTimingsByCharacters(fragment.textToSpeech);
+
+            let durationCaptions = 0;
+            captions.forEach(c => {
+              durationCaptions += c.duration;
+            });
+
+            console.log(`Estimated captions duration for slide ${slideIndex} fragment ${fragmentIndex} is ${durationCaptions / 1000} seconds.`);
+
+            // Allow for a small margin of error, if captions duration is significantly longer than speech duration, we can adjust captions duration to match speech duration, to avoid captions running after speech has finished
+            if (durationCaptions - fragment.captionsMarginError > durationFragment) {
+              console.log(`Adjusting captions duration to match speech duration for slide ${slideIndex} fragment ${fragmentIndex}.`);
+              const scale = (durationFragment) / durationCaptions;
+              captions.forEach(c => {
+                c.duration = Math.round(c.duration * scale);
+              });
+            }
+
+            console.log(`Duration speech ${durationFragment} vs duration captions ${durationCaptions} for slide ${slideIndex} fragment ${fragmentIndex}.`)
+
+            durationFragment = Math.max(durationFragment, durationCaptions);            
+
+            console.log(captions)
+          }
+
+          renderData.fragments.push({
+            title: fragment.title,
+            subtitle: fragment.subtitle,
+            text: fragment.textAppend ? (lastFragmentAppendData.text || '') + ' ' + fragment.textAppend : fragment.text,
+            ulist: fragment.ulistAppend ? [...lastFragmentAppendData.ulist || [], ...fragment.ulistAppend] : fragment.ulist,
+            olist: fragment.olistAppend ? [...lastFragmentAppendData.olist || [], ...fragment.olistAppend] : fragment.olist,
+            showcaseImage: fragment.showcaseImage ? render.imageToHtmlBase64(path.join(projectPath, fragment.showcaseImage)) : null,
+            // expectedDuration: fragment.expectedDuration,
+            startsAt,
+            backgroundColor: fragment.backgroundColor,
+            backgroundImage: fragment?.backgroundImage?.startsWith('http') || fragment?.backgroundImage?.startsWith('/') ? fragment.backgroundImage : (fragment.backgroundImage ? `/projects/${project}/${fragment.backgroundImage}` : null),
+            showcaseImage: fragment?.showcaseImage?.startsWith('http') || fragment?.showcaseImage?.startsWith('/') ? fragment.showcaseImage : (fragment.showcaseImage ? `/projects/${project}/${fragment.showcaseImage}` : null),
+            backgroundVideo: fragment?.backgroundVideo?.startsWith('http') || fragment?.backgroundVideo?.startsWith('/') ? fragment.backgroundVideo : (fragment.backgroundVideo ? `/projects/${project}/${fragment.backgroundVideo}` : null),
+            enlargeSpace: fragment.enlargeSpace,
+            terminalPrompt: fragment.terminalPrompt,
+            terminalSleep: fragment.terminalSleep,
+            terminalHeader: fragment.terminalHeader,
+            // textToSpeech: fragment.textToSpeech,
+            captionsMarginError: fragment.captionsMarginError || 0,
+            captions,
+          });
+
+          startsAt += durationFragment;
+        }
+
+        console.log(`Render data for slide ${startsAt}`, slideIndex, renderData);
+
+        const binaryRender = await render.renderVeogenVideo(engineUrl, renderType, {
           ...videoDefaults,
           ...renderData,
-          expectedDuration: durationSeconds * 1000,
+          expectedDuration: startsAt,
         });
         // This produces file without audio, need further processing to merge with the speech file, but at least we have the video with the correct duration and visuals now
         await fs.promises.writeFile(renderFile, binaryRender);

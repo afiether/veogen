@@ -1,6 +1,7 @@
-const { spawn } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const os = require("os");
 
 // Get audio length
 // ffprobe -i audio.mp3 -show_entries format=duration -v quiet -of csv="p=0"
@@ -177,6 +178,122 @@ async function convertWebMToMP4(webmPath, mp4Path) {
       }
     });
   });
+}
+
+async function randomVideoClips(inputFile, targetDuration, outputFile) {
+
+  function run(cmd, args) {
+    const r = spawnSync(cmd, args, { encoding: "utf8" });
+    if (r.status !== 0) {
+      console.error(r.stderr);
+      throw new Error(cmd + " failed");
+    }
+    return r.stdout.trim();
+  }
+
+  // Get video duration
+  const totalDuration = parseFloat(run("ffprobe", [
+    "-v","error",
+    "-show_entries","format=duration",
+    "-of","default=noprint_wrappers=1:nokey=1",
+    inputFile
+  ]));
+
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(),"clips-"));
+
+  let remaining = targetDuration;
+  let clipIndex = 0;
+
+  const clipFiles = [];
+  const usedSegments = [];
+
+  function overlaps(start,end){
+    for(const s of usedSegments){
+      if(start < s.end && end > s.start){
+        return true;
+      }
+    }
+    return false;
+  }
+
+  while(remaining > 0){
+
+    const clipLength = Math.min(
+      remaining,
+      2 + Math.random()*4
+    );
+
+    let start;
+    let end;
+    let attempts = 0;
+
+    do{
+      start = Math.random() * (totalDuration - clipLength);
+      end = start + clipLength;
+      attempts++;
+    } while(overlaps(start,end) && attempts < 50);
+
+    usedSegments.push({start,end});
+
+    const clipPath = path.join(tempDir,`clip_${clipIndex}.mp4`);
+
+    run("ffmpeg",[
+      "-y",
+      "-ss", start.toString(),
+      "-t", clipLength.toString(),
+      "-i", inputFile,
+      "-c:v","libx264",
+      "-preset","veryfast",
+      "-crf","23",
+      "-pix_fmt","yuv420p",
+      "-movflags","+faststart",
+      "-an",
+      clipPath
+    ]);
+
+    clipFiles.push(clipPath);
+
+    remaining -= clipLength;
+    clipIndex++;
+  }
+
+  // Build concat list
+  const concatFile = path.join(tempDir,"concat.txt");
+
+  fs.writeFileSync(
+    concatFile,
+    clipFiles.map(f => `file '${f}'`).join("\n")
+  );
+
+  // Re-encode final output (fix timestamps)
+  await new Promise((resolve,reject)=>{
+
+    const ff = spawn("ffmpeg",[
+      "-y",
+      "-f","concat",
+      "-safe","0",
+      "-i",concatFile,
+      "-c:v","libx264",
+      "-preset","slow",
+      "-crf","22",
+      "-pix_fmt","yuv420p",
+      "-movflags","+faststart",
+      outputFile
+    ]);
+
+    ff.stderr.on("data",d=>process.stderr.write(d));
+
+    ff.on("close",code=>{
+      if(code===0) resolve();
+      else reject(new Error("ffmpeg concat failed"));
+    });
+
+  });
+
+  // cleanup
+  clipFiles.forEach(f=>fs.unlinkSync(f));
+  fs.unlinkSync(concatFile);
+  fs.rmdirSync(tempDir);
 }
 
 module.exports = {

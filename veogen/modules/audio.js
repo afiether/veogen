@@ -118,7 +118,34 @@ function alignWithGentle(wavPath, transcript) {
   });
 }
 
+function estimateTimingsByCharacters(text) {
+  const words = text.trim().split(/\s+/);
+
+  // --- CONFIG ---
+  // Average speaking speed: ~14 characters per second
+  // → ~71ms per character
+  const msPerChar = 71;
+
+  // Round to nearest 100ms
+  const roundTo100 = ms => Math.round(ms / 100) * 100;
+
+  let start = 0;
+
+  return words.map(word => {
+    const rawDuration = word.length * msPerChar;
+    const duration = roundTo100(rawDuration);
+    const end = start + duration;
+
+    const entry = { word, duration, start, end };
+    start = end;
+
+    return entry;
+  });
+}
+
+
 module.exports = {
   alignWords,
   alignWithGentle,
+  estimateTimingsByCharacters,
 };
