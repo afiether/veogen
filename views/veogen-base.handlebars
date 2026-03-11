@@ -1,115 +1,71 @@
 <style>
 
-
+/* utility classes */
+.hidden { display: none !important; }
 </style>
 
-{{#if backgroundImage}}
-  <img src="{{backgroundImage}}" class="backgroundImage" />
-{{/if}}
+<div id="background-container" style="z-index: 1;"></div>
 
-{{#if backgroundVideo}}
-  <video autoplay muted loop class="backgroundVideo">
-    <source src="{{backgroundVideo}}" type="video/mp4">
-    Your browser does not support the video tag.
-  </video>
-{{/if}}
-
-{{#if glitchTitle}}
-<div class="glitch-wrapper">
-  <h1 class="glitch" data-text="{{{ glitchTitle }}}">
-    {{{ glitchTitle }}}
-  </h1>
+<div class="glitch-wrapper" id="frag-glitch" style="display:none;">
+  <h1 class="glitch" data-text=""></h1>
 </div>
-{{/if}}
 
 <div class="tech-scene">
-  <h1>{{{ title }}}</h1>
-  {{#if subtitle}}
-  <h2>{{{ subtitle }}}</h2>
-  {{/if}}
+  <div class="tech-bar" id="frag-tech-bar"></div>
 
-  <div class="tech-bar"></div>
+  <h1 id="frag-title"></h1>
+  <h2 id="frag-subtitle" class="hidden"></h2>
+
 
   <div class="content-text">
-    {{#if enlargeSpace}}
-    {{!-- add some vertical space if needed --}}
-    <div style="height: {{ enlargeSpace }};"></div>
-    {{/if}}
-    <p>{{{ text }}}</p>
+    <div id="frag-enlarge-space" style="display:none;"></div>
+    <p id="frag-text"></p>
 
     
-    <ul>
-      {{#each ulist}}
-      <li>{{{ this }}}</li>
-      {{/each}}
-    </ul>
 
-    <ol>
-      {{#each olist}}
-      <li>{{{ this }}}</li>
-      {{/each}}
-    </ol>
+    <ul id="frag-ulist"></ul>
+
+    <ol id="frag-olist"></ol>
   </div>
 
-  {{#if showcaseImage }}
-  <div  style="text-align: center;  white-space: nowrap; margin: 1.5em 0; ">
-    {{!-- <center> --}}
-    <span class="helper"></span>
-      <img id="showcaseImage" src="{{ showcaseImage }}" style=" border-radius: 25px; vertical-align: middle;" align="middle"/>
-    {{!-- </center> --}}
-  </div>
-  {{/if}}
+  <div id="frag-showcase-container" style="text-align: center;  white-space: nowrap; margin: 1.5em 0; z-index: 10;"></div>
 
-  {{#if terminalHeader}}
-  <div class="terminal">
-    <div class="terminal-header">{{{ terminalHeader }}}</div>
+
+  <div class="terminal hidden" id="frag-terminal" style="z-index: 10;">
+    <div class="terminal-header" id="frag-terminal-header"></div>
     <div class="terminal-line">
       <span class="prompt">$</span>
       <span class="typing"></span>
     </div>
   </div>
-  {{/if}}
 
-  {{#if matrixTitle}}
-  <div class="matrix-container">
+  <div class="matrix-container hidden" id="frag-matrix">
 
     <div class="matrix-lines"></div>
 
-    <h1 class="matrix-title">
-      {{ matrixTitle }}
-    </h1>
+    <h1 class="matrix-title" id="frag-matrix-title"></h1>
 
   </div>
-  {{/if}}
 
-  {{!-- captions block: words rendered by helper --}}
-  {{#if captions}}
-  <div class="caption-text" id="caption-container">
-    {{{ renderCaptionWords captions }}}
-  </div>
-  {{/if}}
-
-</div>
+  <div class="caption-text" id="caption-container"></div>
 
 
 
-
-{{!-- Here custom elements --}}
-
+{{!-- Flags for Puppeteer --}}
 <div id="animations-finished"></div>
 <div id="page-loaded"></div>
 
 <script>
   // Terminal typing effect and animation driver
-  const text = {{{ toJSON terminalPrompt }}} || '';
-  const terminalSleep = {{{ toJSON terminalSleep }}} || 130;
+  let terminalText = {{{ toJSON terminalPrompt }}} || '';
+  const terminalSleep = {{{ toJSON terminalSleep }}} || 230;
   let i = 0;
 
   function type(){
-    if(i < text.length){
-      $('.typing').append(text.charAt(i));
+    if(i < terminalText.length){
+      $('.typing').append(terminalText.charAt(i));
       i++;
-      setTimeout(type,130);
+      setTimeout(type,terminalSleep);
     }
   }
   setTimeout(type, terminalSleep);
@@ -169,72 +125,27 @@
         }
     }
 
-    const visualElements = {{{ toJSON visualElements }}};
 
-    // driver: iterate the array your server injected
-    if (Array.isArray(visualElements)) {
-        visualElements.forEach((def,i) => {
-            const uid = def.id || `ve_${i}`;   // unique key for the stack
-            const el = getElement(def);
-            applyDefinitions(el, def, uid);
+
+    // helper functions for captions, fragments, and slideshow -------------------
+    function escapeHtml(str) {
+        return String(str).replace(/[&<>\"']/g, function(ch) {
+            return ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'})[ch];
         });
     }
 
-    // Static animations
-    // text climbs up
-    $('.content-text').animate({
-      opacity: 1
-    }, {
-      duration: 900,
-      step: function(now) {
-        const y = 80 - now * 80;
-        $(this).css("transform", `translateY(${y}px)`);
-      }
-    });
-
-    const expectedDuration = {{ toJSON expectedDuration }} || 2200;
-    const techBarDelay = 300;
-
-    // tech bar expands
-    $('.tech-bar').delay(techBarDelay).animate({
-      width: "95%"
-    }, expectedDuration);
-
-    if (!Array.isArray(visualElements) || visualElements.length <= 0) {
-      // If no visual elements, we can mark animations as finished immediately
-      setTimeout(() => markEnd(), expectedDuration + techBarDelay);
+    function renderCaptionWordsJs(arr) {
+        if (!Array.isArray(arr)) return '';
+        return arr.map(w => {
+            const word = escapeHtml(w.word || '');
+            const start = Number(w.start) || 0;
+            const end = Number(w.end) || 0;
+            return `<span class=\"caption-word\" data-start=\"${start}\" data-end=\"${end}\">${word}</span>`;
+        }).join(' ');
     }
 
-    // Cyberpunk glithch effect
-    setInterval(function(){
-
-      $('.glitch').css('transform',
-        `translate(${Math.random()*16-3}px,${Math.random()*26-3}px)`
-      );
-
-      setTimeout(()=>{
-        $('.glitch').css('transform','translate(0,0)');
-      },80);
-
-    },1200);
-
-    // Matrix lines animation
-    $('.matrix-lines').animate({
-      left:"-50%"
-    },3000);
-
-    $('.matrix-title').delay(400).animate({
-      opacity:1
-    },{
-      duration:900,
-      step:function(now){
-        const y = 40 - now*40;
-        $(this).css("transform",`translateY(${y}px)`);
-      }
-    });
-
-    // caption utility functions --------------------------------------------------
     function updateCaptions(timeMs) {
+      let lastEnd = 0;
       $('.caption-word').each(function() {
         const start = parseInt($(this).attr('data-start'));
         const end   = parseInt($(this).attr('data-end'));
@@ -243,27 +154,189 @@
         } else {
           $(this).removeClass('highlight');
         }
+
+        if (!isNaN(end) && end > lastEnd) {
+          lastEnd = end;
+        }
       });
+
+      if (timeMs > lastEnd) {
+        return false;
+      }
+
+      return true;
     }
 
-    const audioVideoElements = $('audio, video');
+    const expectedDuration = {{ toJSON expectedDuration }} || 2200;
+    const techBarDelay = 300;
 
-    if (audioVideoElements.length > 0) {
-      // if there's an audio/video element on the page we automatically hook it
-      $('audio, video').on('timeupdate', function() {
-        // convert seconds to milliseconds
-        const ms = this.currentTime * 1000;
-        updateCaptions(ms);
-      });
+    function applyFragment(frag, idx, count) {
+        console.log('applying fragment', idx, frag);
+        if (frag.title) $('#frag-title').html(frag.title);
+        if (frag.subtitle) {
+            if (frag.subtitle) $('#frag-subtitle').html(frag.subtitle).removeClass('hidden');
+            else $('#frag-subtitle').addClass('hidden');
+        }
+        if (frag.glitchTitle) {
+            if (frag.glitchTitle) {
+                $('#frag-glitch').show();
+                $('#frag-glitch .glitch').attr('data-text', frag.glitchTitle).html(frag.glitchTitle);
+            } else {
+                $('#frag-glitch').hide();
+            }
+        }
+        if (frag.backgroundColor) {
+            $('body').css('background-color', frag.backgroundColor);
+        }
+        if (idx === 0) {
+          // Only for the first slide, set the background image/video. This prevents jarring changes if media is different between fragments
+          if (frag.backgroundImage) {
+              $('#background-container').html(`<img id="backgroundImage" src="${frag.backgroundImage}" class="backgroundImage"/>`);
+          } else if (frag.backgroundVideo) {
+              $('#background-container').html(`<video autoplay muted loop class="backgroundVideo"><source src="${frag.backgroundVideo}" type="video/mp4"></video>`);
+          } else {
+              $('#background-container').empty();
+          }
+        }
+        if (frag.enlargeSpace) {
+            $('#frag-enlarge-space').css('height', frag.enlargeSpace).show();
+        } else {
+            $('#frag-enlarge-space').hide();
+        }
+        if (frag.text) $('#frag-text').html(frag.text);
+        if (Array.isArray(frag.ulist)) {
+            const ul = $('#frag-ulist').empty();
+            frag.ulist.forEach(item => ul.append(`<li>${item}</li>`));
+        }
+        if (Array.isArray(frag.olist)) {
+            const ol = $('#frag-olist').empty();
+            frag.olist.forEach(item => ol.append(`<li>${item}</li>`));
+        }
+        if (frag.showcaseImage) {
+            $('#frag-showcase-container').html(`<img id="showcaseImage" src="${frag.showcaseImage}" style="border-radius:25px;vertical-align:middle;"/>`);
+        } else {
+            $('#frag-showcase-container').empty();
+        }
+        if (frag.terminalHeader) {
+            $('#frag-terminal-header').html(frag.terminalHeader);
+            if (frag.terminalPrompt) {
+                $('#frag-terminal').removeClass('hidden');
+                $('.typing').empty();
+                i = 0;
+                type();
+                terminalText = frag.terminalPrompt;
+            } else {
+                $('#frag-terminal').addClass('hidden');
+            }
+        }
+        if (frag.matrixTitle) {
+            if (frag.matrixTitle) {
+                $('#frag-matrix-title').html(frag.matrixTitle);
+                $('#frag-matrix').removeClass('hidden');
+                $('#frag-matrix .matrix-lines').css('left','0');
+                $('#frag-matrix .matrix-lines').animate({left:'-50%'},3000);
+                $('#frag-matrix .matrix-title').css({opacity:0,transform:'translateY(40px)'});
+                $('#frag-matrix .matrix-title').delay(400).animate({opacity:1},{duration:900,step:function(now){const y=40-now*40;$(this).css('transform',`translateY(${y}px)`);}});
+            } else {
+                $('#frag-matrix').addClass('hidden');
+            }
+        }
+        if (Array.isArray(frag.captions)) {
+            $('#caption-container').html(renderCaptionWordsJs(frag.captions));
+        } else {
+            $('#caption-container').empty();
+        }
+        //clearVisuals();
+        if (Array.isArray(frag.visualElements)) {
+            frag.visualElements.forEach((def,i) => {
+                const uid = def.id || `ve_${i}`;
+                const el = getElement(def);
+                activeVisuals.push(el);
+                applyDefinitions(el, def, uid);
+            });
+        }
+        $('.content-text').stop(true,true).css({opacity:0,transform:'translateY(80px)'});
+        $('.content-text').animate({opacity:1},{duration:900,step:function(now){const y=80-now*80;$(this).css('transform',`translateY(${y}px)`);}});
+        //$('#frag-tech-bar').stop(true,true).css('width','0');
+        //$('#frag-tech-bar').delay(techBarDelay).animate({width:'95%'}, expectedDuration);
+
+      // caption utility functions --------------------------------------------------
+      
+
+      // We disable this for now
+      const audioVideoElements = $('audio');
+
+      if (audioVideoElements.length > 0) {
+        // if there's an audio/video element on the page we automatically hook it
+        $('audio, video').on('timeupdate', function() {
+          // convert seconds to milliseconds
+          const ms = this.currentTime * 1000;
+          updateCaptions(ms);
+        });
+      } else {
+        let startTime = 0;
+        // if no media element, we can use a simple timer to drive captions
+        const captionInterval = setInterval(() => {
+          if (!updateCaptions(startTime)) {
+            clearInterval(captionInterval);
+          }
+          startTime += 100; // update every 100ms
+        }, 100);
+      }
+    }
+
+    function scheduleFragments(frags) {
+        frags.sort((a,b)=>a.startsAt - b.startsAt);
+        frags.forEach((frag,i)=>{
+            setTimeout(()=>applyFragment(frag,i,frags.length), frag.startsAt);
+        });
+        const last = frags[frags.length-1];
+        const totalEnd = (last.startsAt||0) + expectedDuration + techBarDelay;
+        setTimeout(()=>markEnd(), totalEnd);
+    }
+
+    // data passed from server
+    const fragments = {{{ toJSON fragments }}} || null;
+
+    // initial fragment rendering
+    if (Array.isArray(fragments) && fragments.length) {
+        scheduleFragments(fragments);
     } else {
-      let startTime = 0;
-      // if no media element, we can use a simple timer to drive captions
-      setInterval(() => {
-        updateCaptions(startTime);
-        startTime += 100; // update every 100ms
-      }, 100);
+        const initialData = {
+            title: {{{ toJSON title }}},
+            subtitle: {{{ toJSON subtitle }}},
+            backgroundColor: {{{ toJSON backgroundColor }}},
+            backgroundImage: {{{ toJSON backgroundImage }}},
+            backgroundVideo: {{{ toJSON backgroundVideo }}},
+            glitchTitle: {{{ toJSON glitchTitle }}},
+            text: {{{ toJSON text }}},
+            ulist: {{{ toJSON ulist }}},
+            olist: {{{ toJSON olist }}},
+            showcaseImage: {{{ toJSON showcaseImage }}},
+            terminalHeader: {{{ toJSON terminalHeader }}},
+            terminalPrompt: {{{ toJSON terminalPrompt }}},
+            matrixTitle: {{{ toJSON matrixTitle }}},
+            captions: {{{ toJSON captions }}},
+            visualElements: {{{ toJSON visualElements }}},
+            enlargeSpace: {{{ toJSON enlargeSpace }}},
+        };
+        applyFragment(initialData, 0, 1);
+        if (!Array.isArray(initialData.visualElements) || initialData.visualElements.length <=0) {
+            setTimeout(()=>markEnd(), expectedDuration + techBarDelay);
+        }
     }
+
+    // global glitch animation (runs even if .glitch is hidden)
+    setInterval(function(){
+      $('.glitch').css('transform',
+        `translate(${Math.random()*16-3}px,${Math.random()*26-3}px)`
+      );
+      setTimeout(()=>{$('.glitch').css('transform','translate(0,0)');},80);
+    },1200);
+
     
+    
+    $('#frag-tech-bar').delay(techBarDelay).animate({width:'95%'}, expectedDuration);
 
     // FINISH
     pageLoadedFlag.attr('data-loaded', 'TRUE');

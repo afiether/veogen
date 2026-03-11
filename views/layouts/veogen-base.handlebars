@@ -6,10 +6,10 @@
 <title>AFIEther</title>
 <style>
 
-  *{
+  /**{
     transform:translateZ(0);
     backface-visibility:hidden;
-  }
+  }*/
   
   .container {
     width: {{renderWidth}}px;
@@ -153,6 +153,7 @@
 
   /* Terminal */
   .terminal{
+    font-size:54px;
     width:100%;
     padding:30px;
     background:#0b1133;
@@ -249,15 +250,19 @@
     margin: 1em 0;
     font-family: "Bebas Neue", sans-serif;
     color: white;
-    text-shadow:  1px 2px 2px #3f495f;
+    text-shadow:  2px 3px 3px #3f495f;
+    position: absolute;
+    bottom: 50px;
+    z-index: 10;
   }
   .caption-word {
     white-space: pre;            /* preserve spaces between words */
-    transition: background-color 0.35s;
+    transition: background-color 0.35s,  transform 0.35s,;
   }
   .caption-word.highlight {
     background-color: yellow;
-    
+    /*font-size: 1.04em;*/
+    transition: font-size 0.35s, background-color 0.35s;
   }
   
 </style>
