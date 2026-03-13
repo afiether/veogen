@@ -124,16 +124,18 @@ function estimateTimingsByCharacters(text) {
   // --- CONFIG ---
   // Average speaking speed: ~14 characters per second
   // → ~71ms per character
-  const msPerChar = 71;
+  // adapted to my voice
+  const msPerChar = 73;
 
-  // Round to nearest 100ms
-  const roundTo100 = ms => Math.round(ms / 100) * 100;
+  // Minimum duration for any word to ensure it's visible
+  const minDuration = 100;
 
   let start = 0;
 
   return words.map(word => {
     const rawDuration = word.length * msPerChar;
-    const duration = roundTo100(rawDuration);
+    // Ensure minimum duration, but don't round aggressively - use Math.round for more precision
+    const duration = Math.max(minDuration, Math.round(rawDuration));
     const end = start + duration;
 
     const entry = { word, duration, start, end };

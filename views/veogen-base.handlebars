@@ -146,19 +146,28 @@
 
     function updateCaptions(timeMs) {
       let lastEnd = 0;
+      let highlightedWord = null;
+
       $('.caption-word').each(function() {
         const start = parseInt($(this).attr('data-start'));
         const end   = parseInt($(this).attr('data-end'));
-        if (!isNaN(start) && !isNaN(end) && timeMs >= start && timeMs <= end) {
-          $(this).addClass('highlight');
-        } else {
-          $(this).removeClass('highlight');
+
+        if (!isNaN(start) && !isNaN(end) && timeMs >= start && timeMs < end) {
+          highlightedWord = $(this);
         }
 
         if (!isNaN(end) && end > lastEnd) {
           lastEnd = end;
         }
       });
+
+      // Remove highlight from all words
+      $('.caption-word').removeClass('highlight');
+
+      // Add highlight to current word
+      if (highlightedWord) {
+        highlightedWord.addClass('highlight');
+      }
 
       if (timeMs > lastEnd) {
         return false;
@@ -170,103 +179,113 @@
     const expectedDuration = {{ toJSON expectedDuration }} || 2200;
     const techBarDelay = 300;
 
+    // Global variable to track current caption timer
+    let currentCaptionTimer = null;
+
     function applyFragment(frag, idx, count) {
-        console.log('applying fragment', idx, frag);
-        if (frag.title) $('#frag-title').html(frag.title);
-        if (frag.subtitle) {
-            if (frag.subtitle) $('#frag-subtitle').html(frag.subtitle).removeClass('hidden');
-            else $('#frag-subtitle').addClass('hidden');
-        }
-        if (frag.glitchTitle) {
-            if (frag.glitchTitle) {
-                $('#frag-glitch').show();
-                $('#frag-glitch .glitch').attr('data-text', frag.glitchTitle).html(frag.glitchTitle);
-            } else {
-                $('#frag-glitch').hide();
-            }
-        }
-        if (frag.backgroundColor) {
-            $('body').css('background-color', frag.backgroundColor);
-        }
-        if (idx === 0) {
-          // Only for the first slide, set the background image/video. This prevents jarring changes if media is different between fragments
-          if (frag.backgroundImage) {
-              $('#background-container').html(`<img id="backgroundImage" src="${frag.backgroundImage}" class="backgroundImage"/>`);
-          } else if (frag.backgroundVideo) {
-              $('#background-container').html(`<video autoplay muted loop class="backgroundVideo"><source src="${frag.backgroundVideo}" type="video/mp4"></video>`);
+      console.log('applying fragment', idx, frag);
+
+      // Clear any existing caption timer
+      if (currentCaptionTimer) {
+        clearInterval(currentCaptionTimer);
+        currentCaptionTimer = null;
+      }
+      if (frag.title) $('#frag-title').html(frag.title);
+      if (frag.subtitle) {
+          if (frag.subtitle) $('#frag-subtitle').html(frag.subtitle).removeClass('hidden');
+          else $('#frag-subtitle').addClass('hidden');
+      }
+      if (frag.glitchTitle) {
+          if (frag.glitchTitle) {
+              $('#frag-glitch').show();
+              $('#frag-glitch .glitch').attr('data-text', frag.glitchTitle).html(frag.glitchTitle);
           } else {
-              $('#background-container').empty();
+              $('#frag-glitch').hide();
           }
-        }
-        if (frag.enlargeSpace) {
-            $('#frag-enlarge-space').css('height', frag.enlargeSpace).show();
+      }
+      if (frag.backgroundColor) {
+          $('body').css('background-color', frag.backgroundColor);
+      }
+      if (idx === 0) {
+        // Only for the first slide, set the background image/video. This prevents jarring changes if media is different between fragments
+        if (frag.backgroundImage) {
+            $('#background-container').html(`<img id="backgroundImage" src="${frag.backgroundImage}" class="backgroundImage"/>`);
+        } else if (frag.backgroundVideo) {
+            $('#background-container').html(`<video autoplay muted loop class="backgroundVideo"><source src="${frag.backgroundVideo}" type="video/mp4"></video>`);
         } else {
-            $('#frag-enlarge-space').hide();
+            $('#background-container').empty();
         }
-        if (frag.text) $('#frag-text').html(frag.text);
-        if (Array.isArray(frag.ulist)) {
-            const ul = $('#frag-ulist').empty();
-            frag.ulist.forEach(item => ul.append(`<li>${item}</li>`));
-        }
-        if (Array.isArray(frag.olist)) {
-            const ol = $('#frag-olist').empty();
-            frag.olist.forEach(item => ol.append(`<li>${item}</li>`));
-        }
-        if (frag.showcaseImage) {
-            $('#frag-showcase-container').html(`<img id="showcaseImage" src="${frag.showcaseImage}" style="border-radius:25px;vertical-align:middle;"/>`);
-        } else {
-            $('#frag-showcase-container').empty();
-        }
-        if (frag.terminalHeader) {
-            $('#frag-terminal-header').html(frag.terminalHeader);
-            if (frag.terminalPrompt) {
-                $('#frag-terminal').removeClass('hidden');
-                $('.typing').empty();
-                i = 0;
-                type();
-                terminalText = frag.terminalPrompt;
-            } else {
-                $('#frag-terminal').addClass('hidden');
-            }
-        }
-        if (frag.matrixTitle) {
-            if (frag.matrixTitle) {
-                $('#frag-matrix-title').html(frag.matrixTitle);
-                $('#frag-matrix').removeClass('hidden');
-                $('#frag-matrix .matrix-lines').css('left','0');
-                $('#frag-matrix .matrix-lines').animate({left:'-50%'},3000);
-                $('#frag-matrix .matrix-title').css({opacity:0,transform:'translateY(40px)'});
-                $('#frag-matrix .matrix-title').delay(400).animate({opacity:1},{duration:900,step:function(now){const y=40-now*40;$(this).css('transform',`translateY(${y}px)`);}});
-            } else {
-                $('#frag-matrix').addClass('hidden');
-            }
-        }
-        if (Array.isArray(frag.captions)) {
-            $('#caption-container').html(renderCaptionWordsJs(frag.captions));
-        } else {
-            $('#caption-container').empty();
-        }
-        //clearVisuals();
-        if (Array.isArray(frag.visualElements)) {
-            frag.visualElements.forEach((def,i) => {
-                const uid = def.id || `ve_${i}`;
-                const el = getElement(def);
-                activeVisuals.push(el);
-                applyDefinitions(el, def, uid);
-            });
-        }
-        $('.content-text').stop(true,true).css({opacity:0,transform:'translateY(80px)'});
-        $('.content-text').animate({opacity:1},{duration:900,step:function(now){const y=80-now*80;$(this).css('transform',`translateY(${y}px)`);}});
-        //$('#frag-tech-bar').stop(true,true).css('width','0');
-        //$('#frag-tech-bar').delay(techBarDelay).animate({width:'95%'}, expectedDuration);
+      }
+      if (frag.enlargeSpace) {
+          $('#frag-enlarge-space').css('height', frag.enlargeSpace).show();
+      } else {
+          $('#frag-enlarge-space').hide();
+      }
+      if (frag.text) $('#frag-text').html(frag.text);
+      if (Array.isArray(frag.ulist)) {
+          const ul = $('#frag-ulist').empty();
+          frag.ulist.forEach(item => ul.append(`<li>${item}</li>`));
+      }
+      if (Array.isArray(frag.olist)) {
+          const ol = $('#frag-olist').empty();
+          frag.olist.forEach(item => ol.append(`<li>${item}</li>`));
+      }
+      if (frag.showcaseImage) {
+          $('#frag-showcase-container').html(`<img id="showcaseImage" src="${frag.showcaseImage}" style="border-radius:25px;vertical-align:middle;"/>`);
+      } else {
+          $('#frag-showcase-container').empty();
+      }
+      if (frag.terminalHeader) {
+          $('#frag-terminal-header').html(frag.terminalHeader);
+          if (frag.terminalPrompt) {
+              $('#frag-terminal').removeClass('hidden');
+              $('.typing').empty();
+              i = 0;
+              type();
+              terminalText = frag.terminalPrompt;
+          } else {
+              $('#frag-terminal').addClass('hidden');
+          }
+      }
+      if (frag.matrixTitle) {
+          if (frag.matrixTitle) {
+              $('#frag-matrix-title').html(frag.matrixTitle);
+              $('#frag-matrix').removeClass('hidden');
+              $('#frag-matrix .matrix-lines').css('left','0');
+              $('#frag-matrix .matrix-lines').animate({left:'-50%'},3000);
+              $('#frag-matrix .matrix-title').css({opacity:0,transform:'translateY(40px)'});
+              $('#frag-matrix .matrix-title').delay(400).animate({opacity:1},{duration:900,step:function(now){const y=40-now*40;$(this).css('transform',`translateY(${y}px)`);}});
+          } else {
+              $('#frag-matrix').addClass('hidden');
+          }
+      }
+      if (Array.isArray(frag.captions)) {
+          $('#caption-container').html(renderCaptionWordsJs(frag.captions));
+      } else {
+          $('#caption-container').empty();
+      }
+      //clearVisuals();
+      if (Array.isArray(frag.visualElements)) {
+          frag.visualElements.forEach((def,i) => {
+              const uid = def.id || `ve_${i}`;
+              const el = getElement(def);
+              activeVisuals.push(el);
+              applyDefinitions(el, def, uid);
+          });
+      }
+      $('.content-text').stop(true,true).css({opacity:0,transform:'translateY(80px)'});
+      $('.content-text').animate({opacity:1},{duration:900,step:function(now){const y=80-now*80;$(this).css('transform',`translateY(${y}px)`);}});
+      //$('#frag-tech-bar').stop(true,true).css('width','0');
+      //$('#frag-tech-bar').delay(techBarDelay).animate({width:'95%'}, expectedDuration);
 
       // caption utility functions --------------------------------------------------
       
 
       // We disable this for now
-      const audioVideoElements = $('audio');
+      const audioVideoElements = $('audio')
+      const captionTimerInterval = 10;
 
-      if (audioVideoElements.length > 0) {
+      if (audioVideoElements?.length > 0) {
         // if there's an audio/video element on the page we automatically hook it
         audioVideoElements.on('timeupdate', function() {
           // convert seconds to milliseconds
@@ -274,14 +293,15 @@
           updateCaptions(ms);
         });
       } else {
-        let startTime = -{{{ toJSON captionsMarginError }}} || 0; // allow starting captions slightly before speech starts, to account for any sync issues and ensure captions are visible when speech starts
+        let startTime = -frag.captionStartDelay || 0; // allow starting captions slightly before speech starts, to account for any sync issues and ensure captions are visible when speech starts
         // if no media element, we can use a simple timer to drive captions
-        const captionInterval = setInterval(() => {
+        currentCaptionTimer = setInterval(() => {
           if (!updateCaptions(startTime)) {
-            clearInterval(captionInterval);
+            clearInterval(currentCaptionTimer);
+            currentCaptionTimer = null;
           }
-          startTime += 100; // update every 100ms
-        }, 100);
+          startTime += captionTimerInterval;
+        }, captionTimerInterval);
       }
     }
 

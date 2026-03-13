@@ -144,11 +144,21 @@ async function generateAssets(project, engineUrl) {
         for (const fragment of slide.fragments) {
           const fragmentIndex = slide.fragments.indexOf(fragment);
           let durationFragment = speechFilesDurations[fragmentIndex];
-          console.log(`Expected speech duration for slide ${slideIndex} fragment ${fragmentIndex} is ${durationFragment / 1000} seconds.`);
+          console.log(`Expected speech duration for slide ${slideIndex} fragment ${fragmentIndex} is ${durationFragment} millis.`);
           let captions = null;
+          const captionStartDelay = (fragment.captionStartDelay || 400);
           // Captions with timings for the entire slide, to be used in the video render
           if (fragment.enableCaptions) {
             captions = audio.estimateTimingsByCharacters(fragment.textToSpeech);
+
+            // // Account for 350ms for the last caption if less than 350ms
+            // if (captions.length > 0) {
+            //   const lastCaption = captions[captions.length - 1];
+            //   if (lastCaption.duration < 350) {
+            //     lastCaption.duration = 350;
+            //     lastCaption.end = lastCaption.start + lastCaption.duration;
+            //   }
+            // }
 
             let durationCaptions = 0;
             captions.forEach(c => {
@@ -158,11 +168,18 @@ async function generateAssets(project, engineUrl) {
             console.log(`Estimated captions duration for slide ${slideIndex} fragment ${fragmentIndex} is ${durationCaptions / 1000} seconds.`);
 
             // Allow for a small margin of error, if captions duration is significantly longer than speech duration, we can adjust captions duration to match speech duration, to avoid captions running after speech has finished
-            if (durationCaptions - fragment.captionsMarginError > durationFragment) {
+            if (durationCaptions - captionStartDelay > durationFragment) {
               console.log(`Adjusting captions duration to match speech duration for slide ${slideIndex} fragment ${fragmentIndex}.`);
               const scale = (durationFragment) / durationCaptions;
               captions.forEach(c => {
                 c.duration = Math.round(c.duration * scale);
+              });
+              // Recalculate start and end times after scaling durations
+              let currentStart = 0;
+              captions.forEach(c => {
+                c.start = currentStart;
+                c.end = currentStart + c.duration;
+                currentStart = c.end;
               });
             }
 
@@ -172,6 +189,8 @@ async function generateAssets(project, engineUrl) {
 
             console.log(captions)
           }
+
+          console.log(`Fragment ${fragmentIndex} of slide ${slideIndex} starts at ${startsAt} and has expected duration of ${durationFragment} millis.`);
 
           renderData.fragments.push({
             title: fragment.title,
@@ -191,14 +210,16 @@ async function generateAssets(project, engineUrl) {
             terminalSleep: fragment.terminalSleep,
             terminalHeader: fragment.terminalHeader,
             // textToSpeech: fragment.textToSpeech,
-            captionsMarginError: fragment.captionsMarginError || 0,
+            captionStartDelay: captionStartDelay,
             captions,
           });
 
-          startsAt += durationFragment;
+          startsAt += durationFragment + (fragment.captionEndDelay || 350);
+
+          
         }
 
-        console.log(`Render data for slide ${startsAt}`, slideIndex, renderData);
+        // console.log(`Render data for slide ${startsAt}`, slideIndex, renderData);
 
         const binaryRender = await render.renderVeogenVideo(engineUrl, renderType, {
           ...videoDefaults,
