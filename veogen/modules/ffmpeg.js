@@ -296,6 +296,34 @@ async function randomVideoClips(inputFile, targetDuration, outputFile) {
   fs.rmdirSync(tempDir);
 }
 
+async function trimVideoMp4(inputPath, startAt, endAt, outputPath) {
+  // Also fix timeframe issues with -fflags +genpts if needed
+  return new Promise((resolve, reject) => {
+    const args = [
+      '-y',
+      '-i', inputPath,
+      "-ss", startAt,
+      "to", endAt,
+      '-c:v', 'libx264',
+      '-pix_fmt', 'yuv420p',
+      '-fflags', '+genpts',
+      '-c:a', 'aac',
+      outputPath
+    ];
+
+    const ffmpeg = spawn('ffmpeg', args, { stdio: 'inherit' });
+
+    ffmpeg.on('error', reject);
+    ffmpeg.on('close', (code) => {
+      if (code === 0) {
+        resolve(outputPath);
+      } else {
+        reject(new Error(`FFmpeg exited with code ${code}`));
+      }
+    });
+  });
+}
+
 module.exports = {
   generateMp4FromPngAndMp3,
   concatMp4s,

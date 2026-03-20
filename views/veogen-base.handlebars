@@ -28,7 +28,7 @@
     <ol id="frag-olist"></ol>
   </div>
 
-  <div id="frag-showcase-container" style="text-align: center;  white-space: nowrap; margin: 1.5em 0; z-index: 10;"></div>
+  <div id="frag-showcase-container" style="text-align: center;  white-space: nowrap; margin: 1.5em 0; z-index: 9;"></div>
 
 
   <div class="terminal hidden" id="frag-terminal" style="z-index: 10;">
@@ -190,10 +190,16 @@
         clearInterval(currentCaptionTimer);
         currentCaptionTimer = null;
       }
-      if (frag.title) $('#frag-title').html(frag.title);
+      if (frag.title)  {
+        $('#frag-title').html(frag.title);
+      } else {
+        $('#frag-title').empty();
+      }
       if (frag.subtitle) {
           if (frag.subtitle) $('#frag-subtitle').html(frag.subtitle).removeClass('hidden');
           else $('#frag-subtitle').addClass('hidden');
+      } else {
+        $('#frag-subtitle').addClass('hidden');
       }
       if (frag.glitchTitle) {
           if (frag.glitchTitle) {
@@ -202,6 +208,8 @@
           } else {
               $('#frag-glitch').hide();
           }
+      } else {
+        $('#frag-glitch').hide();
       }
       if (frag.backgroundColor) {
           $('body').css('background-color', frag.backgroundColor);
@@ -231,10 +239,15 @@
           frag.olist.forEach(item => ol.append(`<li>${item}</li>`));
       }
       if (frag.showcaseImage) {
-          $('#frag-showcase-container').html(`<img id="showcaseImage" src="${frag.showcaseImage}" style="border-radius:25px;vertical-align:middle;"/>`);
+        $('#frag-showcase-container').html(`<img id="showcaseImage" src="${frag.showcaseImage}" style="border-radius:25px;vertical-align:middle;"/>`);
       } else {
+        if (frag.showcaseVideo) {
+          $('#frag-showcase-container').html(`<video autoplay muted loop id="showcaseVideo" src="${frag.showcaseVideo}" style="border-radius:25px;vertical-align:middle;object-fit:contain;height:${frag.showcaseVideoHeight};"/>`);
+        } else if (!frag.keepShowcaseVideo) {
           $('#frag-showcase-container').empty();
+        }
       }
+      
       if (frag.terminalHeader) {
           $('#frag-terminal-header').html(frag.terminalHeader);
           if (frag.terminalPrompt) {
@@ -269,7 +282,7 @@
           frag.visualElements.forEach((def,i) => {
               const uid = def.id || `ve_${i}`;
               const el = getElement(def);
-              activeVisuals.push(el);
+              //activeVisuals.push(el);
               applyDefinitions(el, def, uid);
           });
       }

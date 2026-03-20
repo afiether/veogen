@@ -78,6 +78,11 @@ async function generateAssets(project, engineUrl) {
     return null;
   }
 
+  function urlOrFromProject(link) {
+    return link?.startsWith('http') || link?.startsWith('/') ? link : (link ? `/projects/${project}/${link}` : null);
+  }
+
+
   const fileContents = fs.readFileSync(projectDefinition, 'utf8');
   const data = yaml.load(fileContents);
 
@@ -87,6 +92,12 @@ async function generateAssets(project, engineUrl) {
     renderWidth: data.info.width,
     renderHeight: data.info.height,
     fps: data.info.fps,
+  };
+
+  const defaultVisualElements = data.defaultVisualElements || [];
+  const defaultFragmentProps = {
+    ...data.defaultFragmentProps,
+    backgroundImage: urlOrFromProject(data.defaultFragmentProps?.backgroundImage),
   };
 
   for (const slide of data.slides) {
@@ -202,16 +213,24 @@ async function generateAssets(project, engineUrl) {
             // expectedDuration: fragment.expectedDuration,
             startsAt,
             backgroundColor: fragment.backgroundColor,
-            backgroundImage: fragment?.backgroundImage?.startsWith('http') || fragment?.backgroundImage?.startsWith('/') ? fragment.backgroundImage : (fragment.backgroundImage ? `/projects/${project}/${fragment.backgroundImage}` : null),
-            showcaseImage: fragment?.showcaseImage?.startsWith('http') || fragment?.showcaseImage?.startsWith('/') ? fragment.showcaseImage : (fragment.showcaseImage ? `/projects/${project}/${fragment.showcaseImage}` : null),
-            backgroundVideo: fragment?.backgroundVideo?.startsWith('http') || fragment?.backgroundVideo?.startsWith('/') ? fragment.backgroundVideo : (fragment.backgroundVideo ? `/projects/${project}/${fragment.backgroundVideo}` : null),
+            backgroundImage: urlOrFromProject(fragment?.backgroundImage),
+            showcaseVideo: urlOrFromProject(fragment?.showcaseVideo),
+            showcaseVideoHeight: fragment.showcaseVideoHeight || '500px',
+            keepShowcaseVideo: fragment.keepShowcaseVideo || false,
+            backgroundVideo: urlOrFromProject(fragment?.backgroundVideo),
             enlargeSpace: fragment.enlargeSpace,
             terminalPrompt: fragment.terminalPrompt,
             terminalSleep: fragment.terminalSleep,
             terminalHeader: fragment.terminalHeader,
+            glitchTitle: fragment.glitchTitle,
             // textToSpeech: fragment.textToSpeech,
             captionStartDelay: captionStartDelay,
             captions,
+            visualElements: [
+              ...defaultVisualElements,
+              ...fragment.visualElements || [],
+            ],
+            ...defaultFragmentProps,
           });
 
           startsAt += durationFragment + (fragment.captionEndDelay || 350);
