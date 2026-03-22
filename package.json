@@ -17,12 +17,15 @@
   "author": "AFIEther",
   "license": "CC-BY-NC-4.0",
   "dependencies": {
+    "@imgly/background-removal-node": "^1.4.5",
     "axios": "^1.10.0",
     "body-parser": "^1.20.2",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "express-handlebars": "^7.1.2",
+    "glob": "^13.0.6",
     "handlebars": "^4.7.8",
+    "jimp": "^1.6.0",
     "js-yaml": "^4.1.0",
     "marked": "^15.0.7",
     "puppeteer": "24.37.0",
@@ -31,7 +34,8 @@
     "puppeteer-stream": "^3.0.22",
     "puppeteer-video-recorder": "^1.0.5",
     "qrcode": "^1.5.4",
-    "serve-index": "^1.9.1"
+    "serve-index": "^1.9.1",
+    "sharp": "^0.34.5"
   },
   "devDependencies": {
     "nodemon": "^3.1.0",

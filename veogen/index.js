@@ -6,6 +6,7 @@ const vertex = require('./modules/vertex');
 const ffmpeg = require('./modules/ffmpeg');
 const render = require('./modules/render');
 const audio = require('./modules/audio');
+const image = require('./modules/image');
 let f5TTS = null;
 
 require('./modules/f5-tts').initF5TTS({
@@ -99,6 +100,8 @@ async function generateAssets(project, engineUrl) {
     ...data.defaultFragmentProps,
     backgroundImage: urlOrFromProject(data.defaultFragmentProps?.backgroundImage),
   };
+
+  await image.applyStagingImageOperations(project, data.stagingImageOps);
 
   for (const slide of data.slides) {
     const title = slide.title;
