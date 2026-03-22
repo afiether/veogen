@@ -206,6 +206,8 @@ async function generateAssets(project, engineUrl) {
 
           console.log(`Fragment ${fragmentIndex} of slide ${slideIndex} starts at ${startsAt} and has expected duration of ${durationFragment} millis.`);
 
+          console.log(fragment.visualElements)
+
           renderData.fragments.push({
             title: fragment.title,
             subtitle: fragment.subtitle,
@@ -218,7 +220,7 @@ async function generateAssets(project, engineUrl) {
             backgroundColor: fragment.backgroundColor,
             backgroundImage: urlOrFromProject(fragment?.backgroundImage),
             showcaseVideo: urlOrFromProject(fragment?.showcaseVideo),
-            showcaseVideoHeight: fragment.showcaseVideoHeight || '500px',
+            showcaseHeight: fragment.showcaseHeight || '500px',
             keepShowcaseVideo: fragment.keepShowcaseVideo || false,
             backgroundVideo: urlOrFromProject(fragment?.backgroundVideo),
             enlargeSpace: fragment.enlargeSpace,

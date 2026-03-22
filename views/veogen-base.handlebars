@@ -77,9 +77,13 @@
     const pageLoadedFlag = $('#page-loaded');
     const pending = new Set();       // “stack” of active animations
 
-    function markStart(id) { pending.add(id); }
+    function markStart(id) { 
+      console.log(`Mark start id ${id}`)
+      pending.add(id); 
+    }
     function markEnd(id) {
         pending.delete(id);
+        console.log(`Marked end id ${id} size ${pending.size}`)
         if (pending.size === 0) {
             animationsFinishedFlag.attr('data-animations-finished','TRUE');
             console.log('All animations finished');
@@ -113,15 +117,25 @@
         // jQuery animate
         if (def.animate) {
             markStart(uid);
-            el.animate(def.animate.properties || {}, def.animate.options || 400,
-                       () => markEnd(uid));
+            el.animate(
+              def.animate.properties || {}, 
+              {
+                ...def.animate.options,
+                complete: () => markEnd(uid),
+              }
+            );
         }
 
         // jQuery UI effect
         if (def.effect) {
             markStart(uid);
-            el.effect(def.effect.name, def.effect.options || {},
-                      def.effect.options || 400, () => markEnd(uid));
+            el.effect(
+              def.effect.name,
+              {
+                ...def.effect.options,
+                complete: () => markEnd(uid),
+              }
+            );
         }
     }
 
@@ -239,10 +253,10 @@
           frag.olist.forEach(item => ol.append(`<li>${item}</li>`));
       }
       if (frag.showcaseImage) {
-        $('#frag-showcase-container').html(`<img id="showcaseImage" src="${frag.showcaseImage}" style="border-radius:25px;vertical-align:middle;"/>`);
+        $('#frag-showcase-container').html(`<img id="showcaseImage" src="${frag.showcaseImage}" style="border-radius:25px;vertical-align:middle;height:${frag.showcaseHeight}"/>`);
       } else {
         if (frag.showcaseVideo) {
-          $('#frag-showcase-container').html(`<video autoplay muted loop id="showcaseVideo" src="${frag.showcaseVideo}" style="border-radius:25px;vertical-align:middle;object-fit:contain;height:${frag.showcaseVideoHeight};"/>`);
+          $('#frag-showcase-container').html(`<video autoplay muted loop id="showcaseVideo" src="${frag.showcaseVideo}" style="border-radius:25px;vertical-align:middle;object-fit:contain;height:${frag.showcaseHeight};"/>`);
         } else if (!frag.keepShowcaseVideo) {
           $('#frag-showcase-container').empty();
         }
@@ -326,7 +340,8 @@
         const last = frags[frags.length-1];
         //const totalEnd = (last.startsAt||0) + expectedDuration + techBarDelay;
         const totalEnd = expectedDuration + techBarDelay;
-        setTimeout(()=>markEnd(), totalEnd);
+        markStart('fragment');
+        setTimeout(()=>markEnd('fragment'), totalEnd);
     }
 
     // data passed from server
@@ -355,7 +370,7 @@
             enlargeSpace: {{{ toJSON enlargeSpace }}},
         };
         applyFragment(initialData, 0, 1);
-        if (!Array.isArray(initialData.visualElements) || initialData.visualElements.length <=0) {
+        if (!Array.isArray(initialData.visualElements) || initialData.visualElements.length <= 0) {
             setTimeout(()=>markEnd(), expectedDuration + techBarDelay);
         }
     }
