@@ -477,7 +477,7 @@ async function renderVideoCapturePage(url, data, filePath) {
 }
 
 
-async function renderVideoPageX11(url, data, filePath) {
+async function renderVideoPageX11(url, data, dataIndex, filePath) {
 
   const width = data.renderWidth || 1920;
   const height = data.renderHeight || 1080;
@@ -518,7 +518,8 @@ async function renderVideoPageX11(url, data, filePath) {
   const page = await browser.newPage();
 
   await page.setViewport({width, height});
-  await page.goto(`http://localhost:${getPort()}/veogenRaw/base?data=${encodeURIComponent(JSON.stringify(data))}`, {
+  // await page.goto(`http://localhost:${getPort()}/veogenRaw/base?data=${encodeURIComponent(JSON.stringify(data))}`, {
+  await page.goto(`http://localhost:${getPort()}/veogenRaw/base?dataIndex=${dataIndex}`, {
     waitUntil: 'networkidle2',
   });
 

@@ -85,11 +85,16 @@ app.post('/renderPage', async (req, res) => {
   })
 });
 
+let dataIndex = 0;
+const dataCache = {};
+
 app.post('/renderVideoPage', async (req, res) => {
   const body = req.body;
 
   const url = body.url;
   const data = body.data;
+
+  dataCache[dataIndex++] = data;
 
   const formattedDate = getFormattedDate();
   // MP4 conversation is done internally in the renderVideoPage function, so we can just name the file as MP4 here
@@ -97,7 +102,7 @@ app.post('/renderVideoPage', async (req, res) => {
 
   const filePath = path.join(__dirname, 'export', fileName);
 
-  await renderVideoPageX11(url, data, filePath);
+  await renderVideoPageX11(url, data, dataIndex - 1, filePath);
 
   res.json({
     fileName,
@@ -105,7 +110,9 @@ app.post('/renderVideoPage', async (req, res) => {
 });
 
 app.get('/veogenRaw/:page', async (req, res) => {
-  const body = req.query.data ? JSON.parse(req.query.data) : {};
+  // const body = req.query.data ? JSON.parse(req.query.data) : {};
+  const dataIndex = req.query.dataIndex ? parseInt(req.query.dataIndex) : 0;
+  const body = dataCache[dataIndex];
 
   const page = req.params.page;  
   res.render(`veogen-${page}`, { 
