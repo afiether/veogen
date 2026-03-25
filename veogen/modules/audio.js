@@ -1,6 +1,9 @@
 
 const fs = require('fs');
 const { exec } = require('child_process');
+const axios = require('axios');
+const path = require("path");
+// const FormData = require("form-data");
 
 // NOTE: no dependencies are declared in package.json yet for any speech
 // library.  The primary implementation below uses Google Cloud Speech-to-
@@ -93,29 +96,103 @@ async function alignWords(wavPath, transcript) {
  * @param {string} transcript
  * @returns {Promise<Array<{word:string,start:number,end:number}>>}
  */
-function alignWithGentle(wavPath, transcript) {
-  return new Promise((resolve, reject) => {
-    const cmd = `gentle --transcript ${JSON.stringify(transcript)} ${JSON.stringify(wavPath)}`;
-    exec(cmd, { maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
-      if (err) {
-        return reject(err);
+async function alignWithGentle(wavPath, transcript) {
+  const form = new FormData();
+
+  const fileBuffer = fs.readFileSync(wavPath);
+  const fileName = path.basename(wavPath);
+
+  // Attach audio file
+  // form.append(
+  //   "audio",
+  //   fileBuffer,
+  //   { 
+  //     fileName,
+  //     contentType: 'audio/wav'
+  //   }
+  // );
+  form.append(
+    "audio",
+    new Blob([fileBuffer], { type: "audio/wav" }),
+    fileName
+  );
+
+
+  // Attach transcript as a virtual file
+  // form.append("transcript", Buffer.from(transcript), {
+  //   filename: "transcript.txt",
+  //   contentType: "text/plain"
+  // });
+  form.append("transcript", new Blob([transcript], { type: "text/plain" }), "transcript.txt");
+
+
+  try {
+    const response = await fetch(
+      "http://localhost:8765/transcriptions?async=false",
+      {
+        method: "POST",
+        body: form,
+        // headers: form.getHeaders(),
+        // ❌ DO NOT manually set headers
       }
-      try {
-        const data = JSON.parse(stdout);
-        const words = [];
-        if (Array.isArray(data.words)) {
-          data.words.forEach(w => {
-            if (w.aligned && w.start && w.end) {
-              words.push({ word: w.word, start: Math.round(w.start * 1000), end: Math.round(w.end * 1000) });
-            }
+    );
+
+    // const response = await axios.post(
+    //   "http://localhost:8765/transcriptions?async=false",
+    //   form,
+    //   {
+    //     headers: form.getHeaders(),
+    //     maxContentLength: Infinity,
+    //     maxBodyLength: Infinity
+    //   }
+    // );
+
+    // const data = response.data;
+    const data = await response.json();
+
+    const words = [];
+    if (Array.isArray(data.words)) {
+      let lastEndWord = 0;
+      for (const w of data.words) {
+        if (w.alignedWord && w.start != null && w.end != null) {
+          const start = Math.round(w.start * 1000);
+          const end = Math.round(w.end * 1000);
+
+          lastEndWord = end;
+
+          words.push({
+            word: w.word,
+            start,
+            end,
+            duration: end - start,
           });
+        } else {
+          // It gave kicks, so fallback on empiric method
+          const empiricWord = estimateTimingsByCharacters(w.word)[0];
+          const spaceDelay = 20;
+          
+          // Account for a short 'space'
+          const start = lastEndWord + spaceDelay;
+          const end = empiricWord.end + lastEndWord + spaceDelay;
+          
+          words.push({
+            word: w.word,
+            start,
+            end,
+            duration: empiricWord.duration,
+          });
+
+          lastEndWord = end;
         }
-        resolve(words);
-      } catch (parseErr) {
-        reject(parseErr);
       }
-    });
-  });
+    }
+
+    return words;
+
+  } catch (err) {
+    console.error("Gentle API error:", err.message);
+    throw err;
+  }
 }
 
 function estimateTimingsByCharacters(text) {

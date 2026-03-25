@@ -160,10 +160,11 @@ async function generateAssets(project, engineUrl) {
           let durationFragment = speechFilesDurations[fragmentIndex];
           console.log(`Expected speech duration for slide ${slideIndex} fragment ${fragmentIndex} is ${durationFragment} millis.`);
           let captions = null;
-          const captionStartDelay = (fragment.captionStartDelay || 400);
+          const captionStartDelay = (fragment.captionStartDelay || 0);
           // Captions with timings for the entire slide, to be used in the video render
           if (fragment.enableCaptions) {
-            captions = audio.estimateTimingsByCharacters(fragment.textToSpeech);
+            // captions = audio.estimateTimingsByCharacters(fragment.textToSpeech);
+            captions = await audio.alignWithGentle(speechFiles[fragmentIndex], fragment.textToSpeech);
 
             // // Account for 350ms for the last caption if less than 350ms
             // if (captions.length > 0) {
@@ -179,23 +180,23 @@ async function generateAssets(project, engineUrl) {
               durationCaptions += c.duration;
             });
 
-            console.log(`Estimated captions duration for slide ${slideIndex} fragment ${fragmentIndex} is ${durationCaptions / 1000} seconds.`);
+            // console.log(`Estimated captions duration for slide ${slideIndex} fragment ${fragmentIndex} is ${durationCaptions / 1000} seconds.`);
 
-            // Allow for a small margin of error, if captions duration is significantly longer than speech duration, we can adjust captions duration to match speech duration, to avoid captions running after speech has finished
-            if (durationCaptions - captionStartDelay > durationFragment) {
-              console.log(`Adjusting captions duration to match speech duration for slide ${slideIndex} fragment ${fragmentIndex}.`);
-              const scale = (durationFragment) / durationCaptions;
-              captions.forEach(c => {
-                c.duration = Math.round(c.duration * scale);
-              });
-              // Recalculate start and end times after scaling durations
-              let currentStart = 0;
-              captions.forEach(c => {
-                c.start = currentStart;
-                c.end = currentStart + c.duration;
-                currentStart = c.end;
-              });
-            }
+            // // Allow for a small margin of error, if captions duration is significantly longer than speech duration, we can adjust captions duration to match speech duration, to avoid captions running after speech has finished
+            // if (durationCaptions - captionStartDelay > durationFragment) {
+            //   console.log(`Adjusting captions duration to match speech duration for slide ${slideIndex} fragment ${fragmentIndex}.`);
+            //   const scale = (durationFragment) / durationCaptions;
+            //   captions.forEach(c => {
+            //     c.duration = Math.round(c.duration * scale);
+            //   });
+            //   // Recalculate start and end times after scaling durations
+            //   let currentStart = 0;
+            //   captions.forEach(c => {
+            //     c.start = currentStart;
+            //     c.end = currentStart + c.duration;
+            //     currentStart = c.end;
+            //   });
+            // }
 
             console.log(`Duration speech ${durationFragment} vs duration captions ${durationCaptions} for slide ${slideIndex} fragment ${fragmentIndex}.`)
 
@@ -205,8 +206,6 @@ async function generateAssets(project, engineUrl) {
           }
 
           console.log(`Fragment ${fragmentIndex} of slide ${slideIndex} starts at ${startsAt} and has expected duration of ${durationFragment} millis.`);
-
-          console.log(fragment.visualElements)
 
           renderData.fragments.push({
             title: fragment.title,
@@ -238,7 +237,7 @@ async function generateAssets(project, engineUrl) {
             ...defaultFragmentProps,
           });
 
-          startsAt += durationFragment + (fragment.captionEndDelay || 350);
+          startsAt += durationFragment + (fragment.captionEndDelay || 100);
 
           
         }
