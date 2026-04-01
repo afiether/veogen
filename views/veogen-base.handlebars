@@ -228,8 +228,7 @@
       if (frag.backgroundColor) {
           $('body').css('background-color', frag.backgroundColor);
       }
-      if (idx === 0) {
-        // Only for the first slide, set the background image/video. This prevents jarring changes if media is different between fragments
+      if (!frag.keepPrevBackground) {
         if (frag.backgroundImage) {
             $('#background-container').html(`<img id="backgroundImage" src="${frag.backgroundImage}" class="backgroundImage"/>`);
         } else if (frag.backgroundVideo) {

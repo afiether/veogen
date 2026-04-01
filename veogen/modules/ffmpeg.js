@@ -2,6 +2,7 @@ const { spawn, spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const os = require("os");
+const glob = require('glob');
 
 // Get audio length
 // ffprobe -i audio.mp3 -show_entries format=duration -v quiet -of csv="p=0"
@@ -45,6 +46,39 @@ async function getAudioDuration(filePath) {
     });
   });
 }
+
+
+/**
+ * Extract audio from a video file and save as WAV
+ * @param {string} inputPath - Path to video file
+ * @param {string} outputPath - Path to output WAV file
+ * @returns {Promise<string>}
+ */
+async function extractAudioToWav(inputPath, outputPath) {
+  return new Promise((resolve, reject) => {
+    const ffmpeg = spawn("ffmpeg", [
+      "-i", inputPath,
+      "-vn",
+      "-acodec", "pcm_s16le",
+      "-ar", "44100",
+      "-ac", "2",
+      outputPath
+    ]);
+
+    ffmpeg.stderr.on("data", (data) => {
+      console.log(`ffmpeg: ${data}`);
+    });
+
+    ffmpeg.on("close", (code) => {
+      if (code === 0) {
+        resolve(outputPath);
+      } else {
+        reject(`FFmpeg exited with code ${code}`);
+      }
+    });
+  });
+}
+
 
 async function generateMp4FromPngAndMp3(pngPath, audioPath, outputPath) {
   const duration = await getAudioDuration(audioPath);
@@ -296,6 +330,45 @@ async function randomVideoClips(inputFile, targetDuration, outputFile) {
   fs.rmdirSync(tempDir);
 }
 
+/**
+ * Convert MOV to MP4 with proper re-encoding (no stutter, fast seeking)
+ * @param {string} inputPath
+ * @param {string} outputPath
+ * @returns {Promise<string>}
+ */
+function convertMovToMp4(inputPath, outputPath) {
+  return new Promise((resolve, reject) => {
+    const ffmpeg = spawn("ffmpeg", [
+      "-i", inputPath,
+
+      "-c:v", "libx264",
+      "-preset", "medium",
+      "-crf", "18",
+      "-pix_fmt", "yuv420p",
+
+      "-c:a", "aac",
+      "-b:a", "192k",
+
+      // ✅ Force constant framerate
+      "-r", "30",
+
+      // ✅ Ensure proper CFR sync (modern replacement for -vsync)
+      "-fps_mode", "cfr",
+
+      "-movflags", "+faststart",
+      "-y",
+      outputPath
+    ]);
+
+    ffmpeg.stderr.on("data", data => console.log(`ffmpeg: ${data}`));
+
+    ffmpeg.on("close", code => {
+      if (code === 0) resolve(outputPath);
+      else reject(new Error(`FFmpeg exited with code ${code}`));
+    });
+  });
+}
+
 async function trimVideoMp4(inputPath, startAt, endAt, outputPath) {
   // Also fix timeframe issues with -fflags +genpts if needed
   return new Promise((resolve, reject) => {
@@ -303,7 +376,7 @@ async function trimVideoMp4(inputPath, startAt, endAt, outputPath) {
       '-y',
       '-i', inputPath,
       "-ss", startAt,
-      "to", endAt,
+      "-to", endAt,
       '-c:v', 'libx264',
       '-pix_fmt', 'yuv420p',
       '-fflags', '+genpts',
@@ -324,10 +397,69 @@ async function trimVideoMp4(inputPath, startAt, endAt, outputPath) {
   });
 }
 
+async function applyStagingVideoOperations(project, config) {
+  if (Array.isArray(config)) {
+    for (const op of config) {
+      const appDir = path.dirname(require.main.filename);
+
+      const operation = op.operation;
+      const input = `${appDir}/veogen/projects/${project}/${op.input}`;
+      
+      const output = `${appDir}/veogen/projects/${project}/${op.output}`;
+      const params = op.params;
+      const outputName = op.outputName;
+
+      if (!fs.existsSync(output)) {
+        fs.mkdirSync(output);
+      }
+
+      const files = glob
+        .globSync(input)
+        // .filter(f => !fs.existsSync(f))
+      ;
+
+      switch (operation) {
+        case 'trimVideo':
+          for (const file of files) {
+            const info = path.parse(file);  
+            const name = info.name;
+            const ext = info.ext;
+            const outputFile = path.join(output, `${outputName || name}${ext}`);
+
+            if (!fs.existsSync(outputFile)) {
+              await trimVideoMp4(file, params.startAt, params.endAt, outputFile);
+            }
+          }
+          break;
+        case 'convertToMp4':
+          for (const file of files) {
+            const info = path.parse(file);  
+            const name = info.name;
+            const ext = '.mp4';
+            const outputFile = path.join(output, `${outputName || name}${ext}`);
+
+            if (!fs.existsSync(outputFile)) {
+              await convertMovToMp4(file, outputFile);
+            }
+          }
+          break;
+        default:
+          console.warn(`Image operation ${operation} not supported!`);
+          break;
+      }
+    }
+  }
+}
+
 module.exports = {
   generateMp4FromPngAndMp3,
   concatMp4s,
   getAudioDuration,
   convertWebMToMP4,
   generateMp4FromMp4AndWav,
+  randomVideoClips,
+  trimVideoMp4,
+  extractAudioToWav,
+  convertMovToMp4,
+  applyStagingVideoOperations,
 };

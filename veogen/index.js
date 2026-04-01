@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const yaml = require('js-yaml');
 
-const vertex = require('./modules/vertex');
+// const vertex = require('./modules/vertex');
 const ffmpeg = require('./modules/ffmpeg');
 const render = require('./modules/render');
 const audio = require('./modules/audio');
@@ -102,6 +102,7 @@ async function generateAssets(project, engineUrl) {
   };
 
   await image.applyStagingImageOperations(project, data.stagingImageOps);
+  await ffmpeg.applyStagingVideoOperations(project, data.stagingVideoOps);
 
   for (const slide of data.slides) {
     const title = slide.title;
@@ -121,15 +122,32 @@ async function generateAssets(project, engineUrl) {
 
       // Generate text to speech for the entire slide fragment by fragment, to be used in the video render
       for (const fragment of slide.fragments) {
-        const speech = fragment.textToSpeech.trim();
-
         const speechFile = path.join(projectPath, `slide${padNr(slideIndex)}_fragment${padNr(fragmentIndex)}-speech.wav`);
-        if (!fs.existsSync(speechFile)) {
-          await f5TTS.textToSpeech(speech, speechFile);
+        if (fragment.textToSpeech) {
+          const speech = fragment.textToSpeech.trim();
+
+          if (!fs.existsSync(speechFile)) {
+            await f5TTS.textToSpeech(speech, speechFile);
+          }
+          
+          speechFiles.push(speechFile);
+        } else {
+          // No speech, we try to check if we have a backgroundVideo, showcaseVideo or if it's capped by the user
+          const media = fragment.showcaseVideo || fragment.backgroundVideo;
+          if (media) {
+            // We need to get the audio out as wav
+            if (!fs.existsSync(speechFile)) {
+              await ffmpeg.extractAudioToWav(path.join(projectPath, media), speechFile);
+            }
+
+            speechFiles.push(speechFile);
+          } else {
+            // Just a very rare situation, we cap the duration
+            speechFiles.push(fragment.capDuration || 3000);
+          }
         }
 
         fragmentIndex++;
-        speechFiles.push(speechFile);
       }
 
       if (!fs.existsSync(renderFile)) {
@@ -137,9 +155,14 @@ async function generateAssets(project, engineUrl) {
         const speechFilesDurations = [];
 
         for (const speechFile of speechFiles) {
-          const duration = await ffmpeg.getAudioDuration(speechFile) * 1000;
-          durationSpeech += duration;
-          speechFilesDurations.push(duration);
+          if (typeof speechFile === 'string') {
+            const duration = await ffmpeg.getAudioDuration(speechFile) * 1000;
+            durationSpeech += duration;
+            speechFilesDurations.push(duration);
+          } else {
+            // In this case it's a number passed from above
+            speechFilesDurations.push(speechFile);
+          }
         }
 
         const allSpeechFile = path.join(projectPath, `slide${padNr(slideIndex)}-speech.wav`);
@@ -221,13 +244,13 @@ async function generateAssets(project, engineUrl) {
             showcaseVideo: urlOrFromProject(fragment?.showcaseVideo),
             showcaseHeight: fragment.showcaseHeight || '500px',
             keepShowcaseVideo: fragment.keepShowcaseVideo || false,
+            keepPrevBackground: fragment.keepPrevBackground || false,
             backgroundVideo: urlOrFromProject(fragment?.backgroundVideo),
             enlargeSpace: fragment.enlargeSpace,
             terminalPrompt: fragment.terminalPrompt,
             terminalSleep: fragment.terminalSleep,
             terminalHeader: fragment.terminalHeader,
             glitchTitle: fragment.glitchTitle,
-            // textToSpeech: fragment.textToSpeech,
             captionStartDelay: captionStartDelay,
             captions,
             visualElements: [
@@ -241,8 +264,6 @@ async function generateAssets(project, engineUrl) {
 
           
         }
-
-        // console.log(`Render data for slide ${startsAt}`, slideIndex, renderData);
 
         const binaryRender = await render.renderVeogenVideo(engineUrl, renderType, {
           ...videoDefaults,
