@@ -1,0 +1,12 @@
+{
+"renderWidth": 1920,
+"renderHeight": 1080,
+"expectedDuration": 240000,
+"fragments": [
+  {
+    "enableCaptions": false,
+    "backgroundVideo": "/projects/007_hutopi-retro-console-unboxing-video/prime2/01_unboxing.mp4"
+
+  }
+]
+}

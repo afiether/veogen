@@ -80,6 +80,48 @@ async function extractAudioToWav(inputPath, outputPath) {
 }
 
 
+/**
+ * Generate silent WAV file
+ * @param {string} outputPath
+ * @param {number} durationMs
+ * @returns {Promise<string>}
+ */
+function generateSilentWav(outputPath, durationMs) {
+  return new Promise((resolve, reject) => {
+    const durationSec = (durationMs / 1000).toString();
+
+    const args = [
+      "-y",
+
+      // Generate silence
+      "-f", "lavfi",
+      //"-i", "anullsrc=r=44100:cl=stereo",
+      "-i", "anullsrc=r=24000:cl=mono",
+
+      // Duration
+      "-t", durationSec,
+
+      // WAV format (PCM)
+      "-acodec", "pcm_s16le",
+
+      outputPath
+    ];
+
+    const ffmpeg = spawn("ffmpeg", args);
+
+    ffmpeg.stderr.on("data", (data) => {
+      console.log("FFmpeg:", data.toString());
+    });
+
+    ffmpeg.on("error", reject);
+
+    ffmpeg.on("close", (code) => {
+      if (code === 0) resolve(outputPath);
+      else reject(new Error(`FFmpeg exited with code ${code}`));
+    });
+  });
+}
+
 async function generateMp4FromPngAndMp3(pngPath, audioPath, outputPath) {
   const duration = await getAudioDuration(audioPath);
 
@@ -132,6 +174,162 @@ async function generateMp4FromMp4AndWav(mp4Path, wavPath, outputPath) {
 
     ffmpeg.on('error', reject);
     ffmpeg.on('close', (code) => {
+      if (code === 0) {
+        resolve(outputPath);
+      } else {
+        reject(new Error(`FFmpeg exited with code ${code}`));
+      }
+    });
+  });
+}
+
+async function generateMp4FromMp4AndWavAlignAudio(mp4Path, wavPath, outputPath) {
+  return new Promise((resolve, reject) => {
+    const args = [
+      "-y",
+      "-i", mp4Path,
+      "-i", wavPath,
+
+      "-c:v", "copy",
+
+      "-c:a", "aac",
+      "-b:a", "192k",
+
+      "-af", "aresample=44100:async=1:first_pts=0",
+      "-ac", "2",
+
+      "-map", "0:v:0",
+      "-map", "1:a:0",
+
+      "-shortest",
+      "-movflags", "+faststart",
+
+      outputPath
+    ];
+
+    const ffmpeg = spawn("ffmpeg", args);
+
+    let stderr = "";
+    let stdout = "";
+
+    ffmpeg.stdout.on("data", (data) => {
+      stdout += data.toString();
+    });
+
+    ffmpeg.stderr.on("data", (data) => {
+      const msg = data.toString();
+      stderr += msg;
+      console.error("FFmpeg:", msg); // 👈 THIS is key
+    });
+
+    ffmpeg.on("error", (err) => {
+      reject(err);
+    });
+
+    ffmpeg.on("close", (code) => {
+      if (code === 0) {
+        resolve(outputPath);
+      } else {
+        reject(new Error(`FFmpeg failed (code ${code})\n${stderr}`));
+      }
+    });
+  });
+}
+
+async function concatWavs(projectPath, wavPaths, outputPath) {
+  const listFile = path.join(projectPath, "concat_list.txt");
+
+  // Create concat list
+  const fileListContent = wavPaths
+    .map((file) => `file '${path.resolve(file).replace(/'/g, "'\\''")}'`)
+    .join("\n");
+
+  fs.writeFileSync(listFile, fileListContent, "utf8");
+
+  return new Promise((resolve, reject) => {
+    const args = [
+      "-y",
+
+      "-f", "concat",
+      "-safe", "0",
+      "-i", listFile,
+
+      // 🔥 Re-encode + normalize audio
+      "-af", "aresample=44100:async=1:first_pts=0",
+      "-ar", "44100",
+      "-ac", "2",
+      "-c:a", "pcm_s16le",
+
+      outputPath
+    ];
+
+    console.log("Running FFmpeg:", ["ffmpeg", ...args].join(" "));
+
+    const ffmpeg = spawn("ffmpeg", args);
+
+    ffmpeg.stderr.on("data", (data) => {
+      console.log("FFmpeg:", data.toString());
+    });
+
+    ffmpeg.on("error", (err) => {
+      fs.unlinkSync(listFile);
+      reject(err);
+    });
+
+    ffmpeg.on("close", (code) => {
+      fs.unlinkSync(listFile);
+      if (code === 0) {
+        resolve(outputPath);
+      } else {
+        reject(new Error(`FFmpeg exited with code ${code}`));
+      }
+    });
+  });
+}
+
+async function concatWavsRobust(projectPath, wavPaths, outputPath) {
+  return new Promise((resolve, reject) => {
+    // Build input args
+    const inputArgs = wavPaths.flatMap(p => ["-i", path.resolve(p)]);
+
+    // Build filter: normalize EACH input first
+    const filterParts = wavPaths.map((_, i) => {
+      // return `[${i}:a]aresample=44100:async=1:first_pts=0,asetpts=PTS-STARTPTS,pan=stereo|c0=c0|c1=c1[a${i}]`;
+      return `[${i}:a]aresample=44100:async=1:first_pts=0,asetpts=PTS-STARTPTS,aformat=channel_layouts=stereo[a${i}]`;
+    });
+
+    // Then concat all normalized streams
+    const concatInputs = wavPaths.map((_, i) => `[a${i}]`).join("");
+    const concatPart = `${concatInputs}concat=n=${wavPaths.length}:v=0:a=1[outa]`;
+
+    const filterComplex = [...filterParts, concatPart].join(";");
+
+    const args = [
+      "-y",
+      ...inputArgs,
+
+      "-filter_complex", filterComplex,
+      "-map", "[outa]",
+
+      // Final output format
+      "-c:a", "pcm_s16le",
+      "-ar", "44100",
+      "-ac", "2",
+
+      outputPath
+    ];
+
+    console.log("Running FFmpeg:", ["ffmpeg", ...args].join(" "));
+
+    const ffmpeg = spawn("ffmpeg", args);
+
+    ffmpeg.stderr.on("data", (data) => {
+      console.log("FFmpeg:", data.toString());
+    });
+
+    ffmpeg.on("error", reject);
+
+    ffmpeg.on("close", (code) => {
       if (code === 0) {
         resolve(outputPath);
       } else {
@@ -397,6 +595,64 @@ async function trimVideoMp4(inputPath, startAt, endAt, outputPath) {
   });
 }
 
+async function cropCenteredHDVideoToReel(inputPath, resWidth, resHeight, outputPath) {
+  return new Promise((resolve, reject) => {
+    const args = [
+      '-i', inputPath,
+      '-vf', `crop=ih*9/16:ih:(iw-ih*9/16)/2:0,scale=${resWidth}:${resHeight}`,
+      '-c:a', 'copy',
+      outputPath
+    ];
+
+    const ffmpeg = spawn('ffmpeg', args);
+
+    ffmpeg.stdout.on('data', data => {
+      console.log(`ffmpeg stdout: ${data}`);
+    });
+
+    ffmpeg.stderr.on('data', data => {
+      console.log(`ffmpeg stderr: ${data}`);
+    });
+
+    ffmpeg.on('close', code => {
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(new Error(`FFmpeg exited with code ${code}`));
+      }
+    });
+  });
+}
+
+async function cropAndScaleFixed(inputPath, width, height, x, y, resWidth, resHeight, outputPath) {
+  return new Promise((resolve, reject) => {
+    const args = [
+      '-i', inputPath,
+      '-vf', `crop=${width}:${height}:${x}:${y},scale=${resWidth}:${resHeight}`,
+      '-c:a', 'copy',
+      outputPath
+    ];
+
+    const ffmpeg = spawn('ffmpeg', args);
+
+    ffmpeg.stdout.on('data', data => {
+      console.log(`ffmpeg stdout: ${data}`);
+    });
+
+    ffmpeg.stderr.on('data', data => {
+      console.log(`ffmpeg stderr: ${data}`);
+    });
+
+    ffmpeg.on('close', code => {
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(new Error(`FFmpeg exited with code ${code}`));
+      }
+    });
+  });
+}
+
 async function applyStagingVideoOperations(project, config) {
   if (Array.isArray(config)) {
     for (const op of config) {
@@ -443,6 +699,30 @@ async function applyStagingVideoOperations(project, config) {
             }
           }
           break;
+        case 'cropCenteredHDVideoToReel':
+          for (const file of files) {
+            const info = path.parse(file);  
+            const name = info.name;
+            const ext = info.ext;
+            const outputFile = path.join(output, `${outputName || name}${ext}`);
+
+            if (!fs.existsSync(outputFile)) {
+              await cropCenteredHDVideoToReel(file, params.resWidth, params.resHeight, outputFile);
+            }
+          }
+          break;
+        case 'cropAndScaleFixed':
+          for (const file of files) {
+            const info = path.parse(file);  
+            const name = info.name;
+            const ext = info.ext;
+            const outputFile = path.join(output, `${outputName || name}${ext}`);
+
+            if (!fs.existsSync(outputFile)) {
+              await cropAndScaleFixed(file, params.width, params.height, params.x, params.y, params.resWidth, params.resHeight, outputFile);
+            }
+          }
+          break;
         default:
           console.warn(`Image operation ${operation} not supported!`);
           break;
@@ -454,12 +734,18 @@ async function applyStagingVideoOperations(project, config) {
 module.exports = {
   generateMp4FromPngAndMp3,
   concatMp4s,
+  concatWavs,
+  concatWavsRobust,
   getAudioDuration,
   convertWebMToMP4,
   generateMp4FromMp4AndWav,
+  generateMp4FromMp4AndWavAlignAudio,
+  generateSilentWav,
   randomVideoClips,
   trimVideoMp4,
   extractAudioToWav,
-  convertMovToMp4,
+  convertMovToMp4,  
+  cropCenteredHDVideoToReel,
+  cropAndScaleFixed,
   applyStagingVideoOperations,
 };

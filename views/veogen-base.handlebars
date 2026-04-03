@@ -325,6 +325,7 @@
           if (!updateCaptions(startTime)) {
             clearInterval(currentCaptionTimer);
             currentCaptionTimer = null;
+            $('#caption-container').empty();
           }
           startTime += captionTimerInterval;
         }, captionTimerInterval);

@@ -104,6 +104,8 @@ async function generateAssets(project, engineUrl) {
   await image.applyStagingImageOperations(project, data.stagingImageOps);
   await ffmpeg.applyStagingVideoOperations(project, data.stagingVideoOps);
 
+  const defaultSilence = 25;
+
   for (const slide of data.slides) {
     const title = slide.title;
     const renderType = slide.renderType;
@@ -119,10 +121,13 @@ async function generateAssets(project, engineUrl) {
       // We may need a different approach with animation videos
       const renderFile = path.join(projectPath, `slide${padNr(slideIndex)}-render.mp4`);
       const speechFiles = [];
+      const silenceFiles = [];
 
       // Generate text to speech for the entire slide fragment by fragment, to be used in the video render
       for (const fragment of slide.fragments) {
         const speechFile = path.join(projectPath, `slide${padNr(slideIndex)}_fragment${padNr(fragmentIndex)}-speech.wav`);
+        const silenceFile = path.join(projectPath, `slide${padNr(slideIndex)}_fragment${padNr(fragmentIndex)}-silence.wav`);
+
         if (fragment.textToSpeech) {
           const speech = fragment.textToSpeech.trim();
 
@@ -131,6 +136,12 @@ async function generateAssets(project, engineUrl) {
           }
           
           speechFiles.push(speechFile);
+
+          const silenceMs = (fragment.captionEndDelay || defaultSilence);
+
+          await ffmpeg.generateSilentWav(silenceFile, silenceMs);
+
+          silenceFiles.push(silenceFile);
         } else {
           // No speech, we try to check if we have a backgroundVideo, showcaseVideo or if it's capped by the user
           const media = fragment.showcaseVideo || fragment.backgroundVideo;
@@ -139,18 +150,23 @@ async function generateAssets(project, engineUrl) {
             if (!fs.existsSync(speechFile)) {
               await ffmpeg.extractAudioToWav(path.join(projectPath, media), speechFile);
             }
-
-            speechFiles.push(speechFile);
           } else {
             // Just a very rare situation, we cap the duration
-            speechFiles.push(fragment.capDuration || 3000);
+            const capDuration = fragment.capDuration || 3000;
+            await ffmpeg.generateSilentWav(speechFileFile, capDuration);
           }
+
+          speechFiles.push(speechFile);
+          // Silence not needed here
+          silenceFiles.push(null);
         }
 
         fragmentIndex++;
       }
 
-      if (!fs.existsSync(renderFile)) {
+      const allSpeechFile = path.join(projectPath, `slide${padNr(slideIndex)}-speech.wav`);
+
+      if (!fs.existsSync(renderFile) || !fs.existsSync(allSpeechFile)) {
         let durationSpeech = 0;
         const speechFilesDurations = [];
 
@@ -165,10 +181,21 @@ async function generateAssets(project, engineUrl) {
           }
         }
 
-        const allSpeechFile = path.join(projectPath, `slide${padNr(slideIndex)}-speech.wav`);
+        // Concatenate all speech files + silences into one, to be used in the video render with the correct duration
+        const audioFiles = [];
+        
+        for (let i = 0; i < speechFiles.length; i++) {
+          const speechFile = speechFiles[i];
+          const silenceFile = silenceFiles[i];
 
-        // Concatenate all speech files into one, to be used in the video render with the correct duration
-        await ffmpeg.concatMp4s(projectPath, speechFiles, allSpeechFile);
+          audioFiles.push(speechFile);
+          if (silenceFile) {
+            audioFiles.push(silenceFile);
+          }
+        }
+
+        console.log(`Audio files to concat: ${audioFiles}`);
+        await ffmpeg.concatWavsRobust(projectPath, audioFiles, allSpeechFile);
 
         console.log(`Total expected speech duration for slide ${slideIndex} is ${durationSpeech / 1000} seconds.`);
 
@@ -260,15 +287,19 @@ async function generateAssets(project, engineUrl) {
             ...defaultFragmentProps,
           });
 
-          startsAt += durationFragment + (fragment.captionEndDelay || 100);
+          startsAt += durationFragment + (fragment.captionEndDelay || defaultSilence);
 
           
         }
 
+        const expectedDuration = startsAt;
+
+        console.log(`Slide ${slideIndex} has expected duration of ${expectedDuration / 1000} secs`);
+
         const binaryRender = await render.renderVeogenVideo(engineUrl, renderType, {
           ...videoDefaults,
           ...renderData,
-          expectedDuration: startsAt,
+          expectedDuration,
         });
         // This produces file without audio, need further processing to merge with the speech file, but at least we have the video with the correct duration and visuals now
         await fs.promises.writeFile(renderFile, binaryRender);
@@ -375,12 +406,14 @@ async function renderVideo(project) {
       const speechFile = path.join(projectPath, `slide${padNr(slideIndex)}-speech.wav`);
 
       if (!fs.existsSync(renderFile)) {
+        console.log(`Render file for slide ${slideIndex} not found!`)
         throw {
           err: `Render file for slide ${slideIndex} not found!`
         }
       }
 
       if (!fs.existsSync(speechFile)) {
+        console.log(`Speech file for slide ${slideIndex} not found!`)
         throw {
           err: `Speech file for slide ${slideIndex} not found!`
         }
@@ -390,7 +423,7 @@ async function renderVideo(project) {
 
       const fragmentVideoPath = path.join(projectPath, `slide${padNr(slideIndex)}-video.mp4`);
 
-      await ffmpeg.generateMp4FromMp4AndWav(renderFile, speechFile, fragmentVideoPath);
+      await ffmpeg.generateMp4FromMp4AndWavAlignAudio(renderFile, speechFile, fragmentVideoPath);
 
       videoFragments.push(fragmentVideoPath);
     } else {
@@ -457,26 +490,23 @@ async function generateChapters(project) {
   let durationHead = 0;
 
   for (const slide of data.slides) {
-    let fragmentIndex = 0;
     const chapterName = slide.title;
     let chapterDuration = 0;
 
-    for (const fragment of slide.fragments) {
-      const mp4Name = `slide${padNr(slideIndex)}_fragment${padNr(fragmentIndex)}-video.mp4`
+      const mp4Name = `slide${padNr(slideIndex)}-video.mp4`
       const mp4File = path.join(projectPath, mp4Name);
 
-      if (!fs.existsSync(mp4File)) {
-        throw {
-          err: `Video file for slide ${slideIndex}, fragment ${fragmentIndex} not found!`
-        }
+    if (!fs.existsSync(mp4File)) {
+      console.log(`Video file for slide ${slideIndex}!`)
+      throw {
+        err: `Video file for slide ${slideIndex}!`
       }
-
-      const duration = await ffmpeg.getAudioDuration(mp4File);
-      
-      chapterDuration += duration;
-
-      fragmentIndex++;
     }
+
+    const duration = await ffmpeg.getAudioDuration(mp4File);
+    
+    chapterDuration += duration;
+
 
     const youtubeTs = formatYouTubeTimestamp(durationHead);
     console.log(`Duration of chapter ${slideIndex} (${chapterName}) is ${chapterDuration} seconds, HEAD at: ${youtubeTs}`);

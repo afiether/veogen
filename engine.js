@@ -482,6 +482,8 @@ async function renderVideoPageX11(url, data, dataIndex, filePath) {
   const width = data.renderWidth || 1920;
   const height = data.renderHeight || 1080;
   const display = ":99";
+  const timeoutMins = data.timeoutMins || 15;
+  const expectedDuration = data.expectedDuration;
 
   // Start Xvfb
   const xvfb = spawn("Xvfb", [
@@ -516,6 +518,9 @@ async function renderVideoPageX11(url, data, dataIndex, filePath) {
   });
 
   const page = await browser.newPage();
+
+  // 🔥 disables timeout completely, had problems with capped videos at 3 min
+  page.setDefaultTimeout(0); 
 
   await page.setViewport({width, height});
   // await page.goto(`http://localhost:${getPort()}/veogenRaw/base?data=${encodeURIComponent(JSON.stringify(data))}`, {
@@ -553,13 +558,25 @@ async function renderVideoPageX11(url, data, dataIndex, filePath) {
 
   ffmpeg.stderr.on("data", d => console.log(d.toString()));
 
-  await page.waitForSelector(
-    "#animations-finished[data-animations-finished]",
-    { timeout: 60000 }
-  ).catch(() => {
-    console.error("Animations timeout — stopping recording.");
-  });
+  console.log(`timeoutMins is ${timeoutMins} expectedDuration ${expectedDuration}`);
 
+  if (expectedDuration > 0) {
+    await sleep(expectedDuration);
+    // await Promise.race([
+    //   sleep(expectedDuration + 2000),
+    //   page.waitForSelector("#animations-finished[data-animations-finished]", {
+    //     timeout: expectedDuration + 2000
+    //   }).catch(() => {})
+    // ]);
+  } else {
+    await page.waitForSelector(
+      "#animations-finished[data-animations-finished]",
+      { timeout: 60000 * timeoutMins }
+    ).catch((err) => {
+      console.error(`Animations timeout — stopping recording. ERR: ${err}`);
+    });
+  }
+  
   // Stop recording
   ffmpeg.kill("SIGINT");
 
