@@ -539,19 +539,26 @@ function convertMovToMp4(inputPath, outputPath) {
     const ffmpeg = spawn("ffmpeg", [
       "-i", inputPath,
 
-      "-c:v", "libx264",
-      "-preset", "medium",
-      "-crf", "18",
+      // "-c:v", "libx264",
+      "-c:v", "h264_nvenc",
+      // "-preset", "medium",
+      // "-crf", "14",
+      '-cq', '18',
+      '-preset', 'p7',
       "-pix_fmt", "yuv420p",
 
       "-c:a", "aac",
       "-b:a", "192k",
 
       // ✅ Force constant framerate
-      "-r", "30",
+      // "-r", "30",
 
       // ✅ Ensure proper CFR sync (modern replacement for -vsync)
       "-fps_mode", "cfr",
+
+      "-g", "120",
+
+      '-fflags',  '+genpts',
 
       "-movflags", "+faststart",
       "-y",
